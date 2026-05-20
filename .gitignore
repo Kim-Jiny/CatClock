@@ -1,0 +1,26 @@
+# Swift / SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+*.xcodeproj
+DerivedData/
+
+# 빌드 산출물
+CatClock.app/
+CatClock.dmg
+CatClock-notarize.zip
+Resources/AppIcon.iconset/
+
+# macOS
+.DS_Store
+
+# 에디터/IDE
+.vscode/
+.idea/
+
+# Claude Code 로컬 설정
+.claude/
+
+# 임시
+*.tmp
+*.log
