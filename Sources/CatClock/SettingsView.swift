@@ -21,6 +21,7 @@ struct SettingsView: View {
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var autoStart = Settings.shared.autoStartOnLaunch
     @State private var loginError = false
+    @State private var layout = LayoutStore.shared
 
     enum Category: String, CaseIterable { case focus = "집중용", commute = "출퇴근용" }
     enum OffKind: String, CaseIterable { case clock = "목표 시각", duration = "근무 시간" }
@@ -41,6 +42,9 @@ struct SettingsView: View {
             case .focus:   focusSection
             case .commute: commuteSection
             }
+
+            Divider()
+            displaySection
 
             Divider()
             autoLaunchSection
@@ -116,6 +120,20 @@ struct SettingsView: View {
                 Text("시작한 시점부터 이만큼 지나면 '퇴근!' 알림.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+        }
+    }
+
+    // MARK: - 표시 옵션
+
+    private var displaySection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("카운트는 마우스 올렸을 때만 표시",
+                   isOn: Binding(
+                    get: { layout.hideCountUnlessHover },
+                    set: { layout.hideCountUnlessHover = $0 }
+                   ))
+            Text("위젯에 마우스를 올리지 않으면 시간 숫자가 숨겨져요. 알람 중에는 항상 보입니다.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 

@@ -21,6 +21,7 @@ final class Settings {
         static let timerPosY = "timerPosY"
         static let timerFontSize = "timerFontSize"
         static let hasTimerPos = "hasTimerPos"
+        static let hideCountUnlessHover = "hideCountUnlessHover"
     }
 
     private init() {
@@ -70,6 +71,12 @@ final class Settings {
     var timerFontSize: Double {
         get { defaults.double(forKey: Key.timerFontSize) }
         set { defaults.set(newValue, forKey: Key.timerFontSize) }
+    }
+
+    /// 카운트(시간 숫자)를 마우스 호버 시에만 표시.
+    var hideCountUnlessHover: Bool {
+        get { defaults.bool(forKey: Key.hideCountUnlessHover) }
+        set { defaults.set(newValue, forKey: Key.hideCountUnlessHover) }
     }
 
     /// 사용자가 넣은 고양이 사진 파일명(앱 지원 폴더 내).

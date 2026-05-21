@@ -9,6 +9,7 @@ struct WidgetView: View {
     @State private var skins = SkinStore.shared
     @State private var layout = LayoutStore.shared
     @State private var hovering = false
+    @State private var revealed = false   // 호버숨김 옵션 켜졌을 때, 클릭으로 컨트롤 노출
     @State private var pulse = false
     @State private var dragStartTimerPos: CGPoint?
     @State private var dragStartFont: CGFloat?
@@ -26,6 +27,22 @@ struct WidgetView: View {
         }
     }
 
+    /// 카운트 표시 여부. 알람 중에는 옵션과 무관하게 강제로 보임.
+    private var showsCount: Bool {
+        if engine.isAlerting { return true }
+        return !layout.hideCountUnlessHover || hovering
+    }
+
+    /// 컨트롤(리사이즈/재생·정지·리셋/시간 위치 핸들) 표시 여부.
+    /// 옵션이 켜졌으면 호버 + 클릭 후에만 노출. 옵션 꺼졌으면 기존대로 호버만으로 노출.
+    private var showsControls: Bool {
+        if engine.isAlerting { return true }
+        if layout.hideCountUnlessHover {
+            return hovering && revealed
+        }
+        return hovering
+    }
+
     var body: some View {
         Group {
             if skins.skin.isCustom {
@@ -36,7 +53,13 @@ struct WidgetView: View {
         }
         .frame(width: bw, height: bh)
         .overlay(alignment: .bottomTrailing) { resizeGrip }
-        .onHover { hovering = $0 }
+        .onHover { h in
+            hovering = h
+            if !h { revealed = false }
+        }
+        .onTapGesture {
+            if layout.hideCountUnlessHover { revealed = true }
+        }
         .onChange(of: engine.isAlerting) { _, alerting in
             withAnimation(alerting
                 ? .easeInOut(duration: 0.5).repeatForever(autoreverses: true)
@@ -54,8 +77,8 @@ struct WidgetView: View {
                 .foregroundStyle(.white)
                 .padding(5 * s)
                 .background(.black.opacity(0.5), in: Circle())
-                .opacity(hovering ? 0.9 : 0)
-                .animation(.easeInOut(duration: 0.15), value: hovering)
+                .opacity(showsControls ? 0.9 : 0)
+                .animation(.easeInOut(duration: 0.15), value: showsControls)
             ResizeHandle()
         }
         .frame(width: 30 * s, height: 30 * s)
@@ -97,8 +120,11 @@ struct WidgetView: View {
                 fill: engine.state == .done ? .red : .white,
                 lineWidth: max(2, layout.timerFontSize * s * 0.09)
             )
-            .opacity(engine.isAlerting && pulse ? 0.45 : 1)
-            .overlay(alignment: .bottomTrailing) { timerHandles }
+            .opacity(showsCount ? (engine.isAlerting && pulse ? 0.45 : 1) : 0)
+            .animation(.easeInOut(duration: 0.15), value: showsCount)
+            .overlay(alignment: .bottomTrailing) {
+                timerHandles.allowsHitTesting(showsControls)
+            }
             .position(x: centerBase.x * s, y: centerBase.y * s)
 
             // 컨트롤/끄기: 하단 고정, 마우스 올렸을 때.
@@ -145,8 +171,8 @@ struct WidgetView: View {
             }
             .frame(width: 18 * s, height: 18 * s)
             .offset(x: 9 * s, y: 9 * s)
-            .opacity(hovering ? 1 : 0)
-            .animation(.easeInOut(duration: 0.15), value: hovering)
+            .opacity(showsControls ? 1 : 0)
+            .animation(.easeInOut(duration: 0.15), value: showsControls)
         }
     }
 
@@ -174,8 +200,8 @@ struct WidgetView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.white)
             .shadow(color: .black.opacity(0.7), radius: 2 * s)
-            .opacity(hovering ? 1 : 0)
-            .animation(.easeInOut(duration: 0.15), value: hovering)
+            .opacity(showsControls ? 1 : 0)
+            .animation(.easeInOut(duration: 0.15), value: showsControls)
         }
     }
 
@@ -220,6 +246,8 @@ struct WidgetView: View {
                 .foregroundStyle(timeColor)
                 .contentTransition(.numericText())
                 .animation(.default, value: engine.displayText)
+                .opacity(showsCount ? 1 : 0)
+                .animation(.easeInOut(duration: 0.15), value: showsCount)
 
             Text(engine.subtitle)
                 .font(.system(size: 11 * s, weight: .medium))
@@ -271,8 +299,8 @@ struct WidgetView: View {
             .font(.system(size: 15 * s, weight: .semibold))
             .buttonStyle(.plain)
             .foregroundStyle(.white)
-            .opacity(hovering ? 1 : 0)
-            .animation(.easeInOut(duration: 0.15), value: hovering)
+            .opacity(showsControls ? 1 : 0)
+            .animation(.easeInOut(duration: 0.15), value: showsControls)
         }
     }
 

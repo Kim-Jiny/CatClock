@@ -66,13 +66,19 @@ struct CatView: View {
     @ViewBuilder
     private var symbolBody: some View {
         ZStack(alignment: .bottom) {
-            // 고양이 몸통
-            Image(systemName: "cat.fill")
-                .font(.system(size: 62 * scale))
-                .foregroundStyle(skin.bodyColor)
-                .shadow(color: .black.opacity(0.35), radius: 2 * scale, y: 1 * scale)
-                .scaleEffect(state == .running ? 1.0 : 0.98)
-                .symbolEffect(.bounce, value: state == .done)
+            // 고양이 몸통 (흰 베이스 + 삼색 패치)
+            ZStack {
+                Image(systemName: "cat.fill")
+                    .font(.system(size: 62 * scale))
+                    .foregroundStyle(skin.bodyColor)
+                    .symbolEffect(.bounce, value: state == .done)
+
+                if let patch = skin.patch {
+                    calicoPatches(patch: patch)
+                }
+            }
+            .shadow(color: .black.opacity(0.35), radius: 2 * scale, y: 1 * scale)
+            .scaleEffect(state == .running ? 1.0 : 0.98)
 
             // 들고 있는 알람시계
             Image(systemName: clockSymbol)
@@ -98,5 +104,33 @@ struct CatView: View {
         }
         .frame(height: 70 * scale)
         .animation(.spring(duration: 0.3), value: state)
+    }
+
+    /// 삼색냥이 무늬: 오렌지 + 어두운 패치를 cat 실루엣 안에서만 보이게 마스크.
+    private func calicoPatches(patch: Color) -> some View {
+        ZStack {
+            Ellipse()
+                .fill(skin.accent)
+                .frame(width: 26 * scale, height: 22 * scale)
+                .offset(x: -13 * scale, y: -16 * scale)
+            Ellipse()
+                .fill(patch)
+                .frame(width: 22 * scale, height: 18 * scale)
+                .offset(x: 14 * scale, y: -12 * scale)
+            Ellipse()
+                .fill(skin.accent)
+                .frame(width: 20 * scale, height: 16 * scale)
+                .offset(x: 10 * scale, y: 10 * scale)
+            Ellipse()
+                .fill(patch)
+                .frame(width: 16 * scale, height: 14 * scale)
+                .offset(x: -12 * scale, y: 8 * scale)
+        }
+        .frame(width: 62 * scale, height: 62 * scale)
+        .mask {
+            Image(systemName: "cat.fill")
+                .font(.system(size: 62 * scale))
+        }
+        .allowsHitTesting(false)
     }
 }

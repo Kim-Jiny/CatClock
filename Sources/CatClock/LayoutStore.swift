@@ -47,6 +47,11 @@ final class LayoutStore {
         }
     }
 
+    /// 켜면 카운트(시간 숫자)는 위젯에 마우스를 올렸을 때만 보임.
+    var hideCountUnlessHover: Bool = false {
+        didSet { Settings.shared.hideCountUnlessHover = hideCountUnlessHover }
+    }
+
     private init() {
         let saved = CGFloat(Settings.shared.widgetScale)
         scale = (saved >= Self.minScale && saved <= Self.maxScale) ? saved : 1
@@ -54,5 +59,6 @@ final class LayoutStore {
         if let p = Settings.shared.timerPos { timerPos = p }
         let fs = CGFloat(Settings.shared.timerFontSize)
         if Self.timerFontRange.contains(fs) { timerFontSize = fs }
+        hideCountUnlessHover = Settings.shared.hideCountUnlessHover
     }
 }
