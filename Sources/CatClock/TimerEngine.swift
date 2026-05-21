@@ -208,11 +208,13 @@ final class TimerEngine {
         endDate = nil
         state = .done
         isAlerting = true
-        NSSound.beep()
+        if Settings.shared.soundOnFinish { NSSound.beep() }
         onFinished?()
-        // 끌 때까지 4초마다 다시 울림.
+        // 끌 때까지 4초마다 다시 울림 (사용자가 비프 옵션 끄면 시각 알림만 유지).
         let t = Timer(timeInterval: 4, repeats: true) { _ in
-            Task { @MainActor in NSSound.beep() }
+            Task { @MainActor in
+                if Settings.shared.soundOnFinish { NSSound.beep() }
+            }
         }
         RunLoop.main.add(t, forMode: .common)
         alertTicker = t

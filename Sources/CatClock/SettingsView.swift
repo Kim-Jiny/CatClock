@@ -20,6 +20,7 @@ struct SettingsView: View {
 
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var autoStart = Settings.shared.autoStartOnLaunch
+    @State private var soundOnFinish = Settings.shared.soundOnFinish
     @State private var loginError = false
     @State private var layout = LayoutStore.shared
 
@@ -45,6 +46,9 @@ struct SettingsView: View {
 
             Divider()
             displaySection
+
+            Divider()
+            alertSection
 
             Divider()
             autoLaunchSection
@@ -133,6 +137,19 @@ struct SettingsView: View {
                     set: { layout.hideCountUnlessHover = $0 }
                    ))
             Text("위젯에 마우스를 올리지 않으면 시간 숫자가 숨겨져요. 알람 중에는 항상 보입니다.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - 알림
+
+    private var alertSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("완료 시 소리 알림", isOn: $soundOnFinish)
+                .onChange(of: soundOnFinish) { _, on in
+                    Settings.shared.soundOnFinish = on
+                }
+            Text("끄면 시각 알림(위젯 깜빡임)만 유지돼요. 4초 간격 반복 소리도 같이 꺼집니다.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -266,6 +283,7 @@ struct SettingsView: View {
         }
         launchAtLogin = LoginItem.isEnabled
         autoStart = Settings.shared.autoStartOnLaunch
+        soundOnFinish = Settings.shared.soundOnFinish
     }
 
     private func apply() {

@@ -22,11 +22,13 @@ final class Settings {
         static let timerFontSize = "timerFontSize"
         static let hasTimerPos = "hasTimerPos"
         static let hideCountUnlessHover = "hideCountUnlessHover"
+        static let soundOnFinish = "soundOnFinish"
     }
 
     private init() {
         defaults.register(defaults: [
-            Key.isWidgetVisible: true
+            Key.isWidgetVisible: true,
+            Key.soundOnFinish: true
         ])
     }
 
@@ -77,6 +79,12 @@ final class Settings {
     var hideCountUnlessHover: Bool {
         get { defaults.bool(forKey: Key.hideCountUnlessHover) }
         set { defaults.set(newValue, forKey: Key.hideCountUnlessHover) }
+    }
+
+    /// 타이머 완료(및 4초 반복 알람) 시 소리(NSSound.beep) 재생.
+    var soundOnFinish: Bool {
+        get { defaults.bool(forKey: Key.soundOnFinish) }
+        set { defaults.set(newValue, forKey: Key.soundOnFinish) }
     }
 
     /// 사용자가 넣은 고양이 사진 파일명(앱 지원 폴더 내).
