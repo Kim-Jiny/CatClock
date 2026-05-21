@@ -17,20 +17,20 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.1</string>
+	<string>1.0.2</string>
 	<key>CFBundleVersion</key>
-	<string>2</string>
+	<string>3</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>CatClock</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 	<key>SUFeedURL</key>
 	<string>https://jiny.shop/projects/cat-clock/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>5GqN7mPNbLP3RWJM3/YI3dP0hIMFsrfsQHURgnXrczM=</string>
-	<key>SUEnableAutomaticChecks</key>
-	<true/>
 </dict>
 </plist>
