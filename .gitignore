@@ -8,7 +8,9 @@ DerivedData/
 # 빌드 산출물
 CatClock.app/
 CatClock.dmg
+CatClock.zip
 CatClock-notarize.zip
+CatClock-sparkle.sig
 Resources/AppIcon.iconset/
 
 # macOS

@@ -18,7 +18,25 @@ APP="${APP_NAME}.app"
 # Launch Services 캐시 충돌 회피를 위해 볼륨 이름은 앱 이름과 구분.
 VOL="Install ${APP_NAME}"
 DMG="${APP_NAME}.dmg"
+SPARKLE_ZIP="${APP_NAME}.zip"               # Sparkle 자동 업데이트 자산
+SPARKLE_SIG_OUT="${APP_NAME}-sparkle.sig"   # release.sh 가 읽어 appcast 에 박는 EdDSA 서명 라인
 NOTARY_PROFILE="${NOTARY_PROFILE:-CatClockNotary}"
+SPARKLE_VERSION="2.9.2"
+SPARKLE_CACHE="${HOME}/Library/Application Support/CatClock/sparkle-${SPARKLE_VERSION}"
+
+# --- Sparkle 도구·프레임워크 부트스트랩 ---
+ensure_sparkle() {
+  if [ ! -x "${SPARKLE_CACHE}/bin/sign_update" ]; then
+    echo "▶︎ Sparkle ${SPARKLE_VERSION} 도구 다운로드…"
+    mkdir -p "$SPARKLE_CACHE"
+    curl -fsSL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" \
+      -o "${SPARKLE_CACHE}/sparkle.tar.xz"
+    tar -xf "${SPARKLE_CACHE}/sparkle.tar.xz" -C "$SPARKLE_CACHE"
+    rm "${SPARKLE_CACHE}/sparkle.tar.xz"
+  fi
+  SPARKLE_BIN="${SPARKLE_CACHE}/bin"
+}
+ensure_sparkle
 
 # --- Developer ID Application 인증서 자동 탐색 ---
 DEV_ID_LINE="$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 || true)"
@@ -36,19 +54,42 @@ swift build -c release
 BIN=".build/release/${APP_NAME}"
 [ -x "$BIN" ] || { echo "✗ 빌드 산출물 없음"; exit 1; }
 
-rm -rf "$APP" "$DMG"
-mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
+rm -rf "$APP" "$DMG" "$SPARKLE_ZIP" "$SPARKLE_SIG_OUT"
+mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources" "${APP}/Contents/Frameworks"
 cp Resources/Info.plist "${APP}/Contents/Info.plist"
 cp Resources/AppIcon.icns "${APP}/Contents/Resources/AppIcon.icns"
 cp "$BIN" "${APP}/Contents/MacOS/${APP_NAME}"
 chmod +x "${APP}/Contents/MacOS/${APP_NAME}"
 
+# Sparkle.framework 임베드: SwiftPM 은 .app 번들 임베딩을 안 해줘서 수동 복사.
+SPARKLE_FW_SRC=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+[ -d "$SPARKLE_FW_SRC" ] || { echo "✗ Sparkle.framework 빌드 산출물 없음: $SPARKLE_FW_SRC"; exit 1; }
+ditto "$SPARKLE_FW_SRC" "${APP}/Contents/Frameworks/Sparkle.framework"
+
+# SwiftPM 산출물 바이너리에는 @executable_path/../Frameworks rpath 가 없어
+# Contents/Frameworks/Sparkle.framework 를 못 찾는다. 서명 전에 추가.
+install_name_tool -add_rpath "@executable_path/../Frameworks" \
+                  "${APP}/Contents/MacOS/${APP_NAME}" 2>/dev/null || true
+
 # --- 2. Developer ID 서명 (하드닝 런타임 + 타임스탬프) ---
+# Sparkle 권장 순서: 안쪽(helper·xpc) → framework → main 실행파일 → .app
 echo "▶︎ 코드서명(hardened runtime)…"
-codesign --force --options runtime --timestamp \
-         --sign "$DEV_ID" "${APP}/Contents/MacOS/${APP_NAME}"
-codesign --force --options runtime --timestamp \
-         --sign "$DEV_ID" "$APP"
+SPARKLE_FW="${APP}/Contents/Frameworks/Sparkle.framework"
+SPARKLE_VER_DIR="${SPARKLE_FW}/Versions/B"
+codesign --force --options runtime --timestamp --sign "$DEV_ID" \
+         "${SPARKLE_VER_DIR}/XPCServices/Installer.xpc"
+codesign --force --options runtime --timestamp --sign "$DEV_ID" \
+         "${SPARKLE_VER_DIR}/XPCServices/Downloader.xpc"
+codesign --force --options runtime --timestamp --sign "$DEV_ID" \
+         "${SPARKLE_VER_DIR}/Autoupdate"
+codesign --force --options runtime --timestamp --sign "$DEV_ID" \
+         "${SPARKLE_VER_DIR}/Updater.app"
+codesign --force --options runtime --timestamp --sign "$DEV_ID" \
+         "$SPARKLE_FW"
+codesign --force --options runtime --timestamp --sign "$DEV_ID" \
+         "${APP}/Contents/MacOS/${APP_NAME}"
+codesign --force --options runtime --timestamp --sign "$DEV_ID" \
+         "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 
 # --- 3. .app 공증 (zip 제출) ---
@@ -60,6 +101,15 @@ xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
 rm -f "$ZIP"
 echo "▶︎ 스테이플(.app)…"
 xcrun stapler staple "$APP"
+
+# --- 3.5. Sparkle 자동 업데이트용 ZIP + EdDSA 서명 ---
+# 공증·스테이플된 .app 을 ZIP 으로 묶고 sign_update 로 EdDSA 서명을 생성.
+# ZIP 자체는 공증 불필요 — Sparkle 이 풀어서 공증된 .app 을 검증한다.
+echo "▶︎ Sparkle ZIP + EdDSA 서명…"
+ditto -c -k --keepParent "$APP" "$SPARKLE_ZIP"
+# sign_update 출력 예: sparkle:edSignature="..." length="..."
+"$SPARKLE_BIN/sign_update" "$SPARKLE_ZIP" > "$SPARKLE_SIG_OUT"
+echo "  서명 라인: $(cat "$SPARKLE_SIG_OUT")"
 
 # --- 4. DMG 구성 (드래그해서 Applications 로) ---
 echo "▶︎ DMG 생성…"
@@ -171,6 +221,9 @@ xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
 xcrun stapler staple "$DMG"
 
 echo
-echo "✓ 완료: $(pwd)/${DMG}"
+echo "✓ 완료:"
+echo "  · DMG (사람 다운로드):  $(pwd)/${DMG}"
+echo "  · ZIP (Sparkle 자동업): $(pwd)/${SPARKLE_ZIP}"
+echo "  · 서명 라인:             $(pwd)/${SPARKLE_SIG_OUT}"
 echo "  검증: spctl -a -t open --context context:primary-signature -v \"$DMG\""
 echo "  이 DMG를 사이트에 올리면 됩니다. 받는 사람은 열어서 앱을 Applications로 드래그 → 더블클릭 실행."

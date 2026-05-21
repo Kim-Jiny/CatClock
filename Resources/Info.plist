@@ -26,5 +26,11 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>CatClock</string>
+	<key>SUFeedURL</key>
+	<string>https://jiny.shop/projects/cat-clock/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>5GqN7mPNbLP3RWJM3/YI3dP0hIMFsrfsQHURgnXrczM=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 </dict>
 </plist>

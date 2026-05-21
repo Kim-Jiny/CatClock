@@ -7,10 +7,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: FloatingPanel!
     private var settingsWindow: NSWindow?
+    private var aboutWindow: NSWindow?
     private let menu = NSMenu()
     private let store = Settings.shared
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Sparkle 업데이터 초기화: startingUpdater=true 라 시동 시 + 24시간 주기 자동 체크 시작.
+        _ = UpdaterController.shared
         setupPanel()
         setupMenuBar()
 
@@ -76,6 +79,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func rebuildMenu() {
         let engine = TimerEngine.shared
         menu.removeAllItems()
+
+        menu.addItem(withTitle: "CatClock 정보…", action: #selector(openAbout), keyEquivalent: "")
+            .target = self
+
+        menu.addItem(.separator())
 
         let status = NSMenuItem(title: statusLine(), action: nil, keyEquivalent: "")
         status.isEnabled = false
@@ -187,6 +195,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+
+    @objc private func checkForUpdates() {
+        UpdaterController.shared.checkForUpdates(nil)
+    }
+
+    @objc private func openAbout() {
+        if aboutWindow == nil {
+            let view = AboutView(
+                onUpdate: { [weak self] in self?.checkForUpdates() },
+                onClose: { [weak self] in self?.aboutWindow?.close() }
+            )
+            let controller = NSHostingController(rootView: view)
+            let window = NSWindow(contentViewController: controller)
+            window.styleMask = [.titled, .closable]
+            window.title = "CatClock 정보"
+            window.isReleasedWhenClosed = false
+            window.level = .floating
+            window.setContentSize(controller.view.fittingSize)
+            window.center()
+            aboutWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        aboutWindow?.makeKeyAndOrderFront(nil)
     }
 }
 
