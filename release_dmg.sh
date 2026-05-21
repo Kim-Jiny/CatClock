@@ -63,6 +63,18 @@ xcrun stapler staple "$APP"
 
 # --- 4. DMG 구성 (드래그해서 Applications 로) ---
 echo "▶︎ DMG 생성…"
+
+# 이전 실행의 잔여 마운트 정리. "Install CatClock", "Install CatClock 1" 등 변종 포함.
+# 남아있으면 convert 가 디스크 이미지를 못 읽고 실패한다.
+shopt -s nullglob
+for stale in "/Volumes/$VOL"*; do
+  [ -d "$stale" ] || continue
+  echo "  잔여 마운트 정리: $stale"
+  hdiutil detach "$stale" -force >/dev/null 2>&1 \
+    || diskutil eject "$stale" >/dev/null 2>&1 || true
+done
+shopt -u nullglob
+
 STAGE="$(mktemp -d)"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
@@ -104,26 +116,43 @@ EOF
 sync
 # Finder 환경설정과 무관하게 배경 파일을 완전히 숨김.
 chflags hidden "$MNT/.bg.png" 2>/dev/null || true
-# detach: Finder 핸들이 남아 convert 가 실패하지 않게 단계적으로 정리.
+# detach: Finder 핸들이 남아 convert 가 실패하지 않게 끈질기게 정리.
+# 자동 번호 변종("Install CatClock 1" 등)까지 함께 강제 분리.
 sleep 1
-hdiutil detach "$MNT" -force >/dev/null 2>&1 || diskutil eject "$MNT" >/dev/null 2>&1 || true
-# Spotlight·Finder 정리될 시간.
-for _ in 1 2 3 4 5; do
-  [ -d "$MNT" ] || break
+shopt -s nullglob
+for try in 1 2 3 4 5; do
+  hdiutil detach "$MNT" -force >/dev/null 2>&1 \
+    || diskutil eject "$MNT" >/dev/null 2>&1 || true
+  for variant in "$MNT "*; do
+    [ -d "$variant" ] || continue
+    hdiutil detach "$variant" -force >/dev/null 2>&1 \
+      || diskutil eject "$variant" >/dev/null 2>&1 || true
+  done
+  remaining=0
+  [ -d "$MNT" ] && remaining=1
+  for variant in "$MNT "*; do [ -d "$variant" ] && remaining=1; done
+  [ "$remaining" -eq 0 ] && break
   sleep 1
 done
+shopt -u nullglob
 
-# 압축 읽기전용으로 변환 (간헐적 실패 → 최대 3회 재시도).
+# 압축 읽기전용으로 변환. 간헐 실패 대비 3회 재시도, 마지막 로그는 보여줘서 디버깅 가능하게.
+CONVERT_LOG="$(mktemp)"
 for attempt in 1 2 3; do
   if hdiutil convert "$RW_DMG" -format UDZO -imagekey zlib-level=9 \
-       -o "$DMG" -ov >/dev/null 2>&1; then
+       -o "$DMG" -ov >"$CONVERT_LOG" 2>&1; then
     break
   fi
   echo "  convert 실패, 재시도 ${attempt}..."
   sleep 3
 done
-[ -f "$DMG" ] || { echo "✗ DMG convert 실패"; exit 1; }
-rm -f "$RW_DMG"; rm -rf "$STAGE"
+if [ ! -f "$DMG" ]; then
+  echo "✗ DMG convert 실패. 마지막 시도 로그:"
+  sed 's/^/    /' "$CONVERT_LOG"
+  rm -f "$CONVERT_LOG"
+  exit 1
+fi
+rm -f "$CONVERT_LOG" "$RW_DMG"; rm -rf "$STAGE"
 
 # --- 5. DMG 서명·공증·스테이플 ---
 echo "▶︎ DMG 서명·공증·스테이플…"
