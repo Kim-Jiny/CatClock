@@ -84,13 +84,23 @@ cp Resources/dmg_background.png "$STAGE/.bg.png"
 RW_DMG="$(mktemp -u).dmg"
 hdiutil create -srcfolder "$STAGE" -volname "$VOL" -fs HFS+ \
   -format UDRW -ov "$RW_DMG" >/dev/null
-MNT="/Volumes/$VOL"
-hdiutil attach "$RW_DMG" -nobrowse >/dev/null
+# 잔여 마운트가 남아있으면 hdiutil 이 자동 번호("Install CatClock 1")로 마운트한다.
+# 그 경우 하드코딩한 "$VOL" 로 AppleScript/chflags 가 엉뚱한 볼륨을 건드려
+# .DS_Store 가 빈 채로 convert 되어 install 창 레이아웃·배경이 통째로 깨진다.
+# 실제 마운트 경로를 hdiutil 출력에서 받아 일관되게 쓴다.
+ATTACH_OUT="$(hdiutil attach "$RW_DMG" -nobrowse)"
+MNT="$(echo "$ATTACH_OUT" | awk -F'\t' '/Apple_HFS|Apple_APFS/ {print $NF}' | tail -1 | sed 's/[[:space:]]*$//')"
+[ -d "$MNT" ] || { echo "✗ 마운트 경로를 확정하지 못했습니다: '$MNT'"; echo "$ATTACH_OUT"; exit 1; }
+DISKNAME="$(basename "$MNT")"
+if [ "$DISKNAME" != "$VOL" ]; then
+  echo "  ⚠︎ 잔여 마운트로 자동 번호됨: '$DISKNAME' (기대: '$VOL'). 진행은 계속."
+fi
 
 # 창 레이아웃: 한글 안내 배경 + 앱(좌) / Applications(우) (드래그 유도)
-osascript <<EOF || true
+# AppleScript 실패는 곧 install 창이 깨진다는 뜻이므로 절대 || true 로 삼키지 않는다.
+osascript <<EOF
 tell application "Finder"
-  tell disk "$VOL"
+  tell disk "$DISKNAME"
     open
     set current view of container window to icon view
     set toolbar visible of container window to false
