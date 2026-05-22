@@ -12,13 +12,12 @@ struct CatView: View {
         state == .done ? "alarm.waves.left.and.right.fill" : "alarmclock.fill"
     }
 
-    /// 상태 뱃지(머리 옆 작은 표시).
+    /// 상태 뱃지(머리 옆 작은 표시). 일시정지/완료만 표시 — idle 은 시각 잡음 줄이려 생략.
     private var badge: (symbol: String, color: Color)? {
         switch state {
-        case .idle:    return ("zzz", .white.opacity(0.7))
-        case .running: return nil
-        case .paused:  return ("pause.fill", .yellow)
-        case .done:    return ("exclamationmark.2", .red)
+        case .idle, .running: return nil
+        case .paused:         return ("pause.fill", .yellow)
+        case .done:           return ("exclamationmark.2", .red)
         }
     }
 

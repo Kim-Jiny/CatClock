@@ -47,13 +47,7 @@ struct WidgetView: View {
     }
 
     var body: some View {
-        Group {
-            if skins.skin.isCustom {
-                customWidget
-            } else {
-                boxedWidget
-            }
-        }
+        widget
         .frame(width: bw, height: bh)
         .overlay(alignment: .bottomTrailing) { resizeGrip }
         .onHover { h in
@@ -88,33 +82,18 @@ struct WidgetView: View {
         .padding(4 * s)
     }
 
-    // MARK: - 사용자 사진 (박스 없음, 투명)
+    // MARK: - 위젯 본체 (투명, 박스 없음)
 
-    private var customWidget: some View {
-        let img = CustomCat.load()
-        let area = imageRect(imgSize: img?.size, in: LayoutStore.baseSize)
+    private var widget: some View {
+        let customImg = skins.skin.isCustom ? CustomCat.load() : nil
+        let area = imageRect(imgSize: customImg?.size, in: LayoutStore.baseSize)
         let centerBase = clampedTimerCenter(in: area)
 
         return ZStack {
             // 투명 영역도 잡아서 창 이동.
             Color.white.opacity(0.001)
 
-            if let img {
-                Image(nsImage: img)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: bw, height: bh)
-                    .scaleEffect(engine.state == .done ? 1.04 : 1)
-                    .animation(.spring(duration: 0.35), value: engine.state)
-            } else {
-                VStack(spacing: 4 * s) {
-                    Image(systemName: "photo.badge.plus")
-                        .font(.system(size: 34 * s))
-                    Text("설정에서 사진을 골라주세요")
-                        .font(.system(size: 11 * s))
-                }
-                .foregroundStyle(.white.opacity(0.85))
-            }
+            catContent(customImg: customImg)
 
             // 이동·크기 가능한 시간(네이티브 크기로 그려서 또렷함).
             OutlinedText(
@@ -138,11 +117,37 @@ struct WidgetView: View {
             // 컨트롤/끄기: 하단 고정, 마우스 올렸을 때.
             VStack {
                 Spacer()
-                customControls
+                controls
             }
             .padding(.bottom, 6 * s)
         }
         .frame(width: bw, height: bh)
+    }
+
+    /// 고양이 표시. 사용자 사진 스킨이면 PNG, 아니면 SF Symbol 기반 CatView.
+    @ViewBuilder
+    private func catContent(customImg: NSImage?) -> some View {
+        if skins.skin.isCustom {
+            if let img = customImg {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: bw, height: bh)
+                    .scaleEffect(engine.state == .done ? 1.04 : 1)
+                    .animation(.spring(duration: 0.35), value: engine.state)
+            } else {
+                VStack(spacing: 4 * s) {
+                    Image(systemName: "photo.badge.plus")
+                        .font(.system(size: 34 * s))
+                    Text("설정에서 사진을 골라주세요")
+                        .font(.system(size: 11 * s))
+                }
+                .foregroundStyle(.white.opacity(0.85))
+            }
+        } else {
+            // 위젯 크기에 어울리게 키워 표시. CatView 자체는 height 70*scale 기준.
+            CatView(skin: skins.skin, state: engine.state, scale: s * 1.6)
+        }
     }
 
     /// 시간 위 핸들: 전체=이동, 우하단 작은 점=크기조절. (창 이동 차단)
@@ -185,7 +190,7 @@ struct WidgetView: View {
     }
 
     @ViewBuilder
-    private var customControls: some View {
+    private var controls: some View {
         if engine.isAlerting {
             Button {
                 engine.acknowledge()
@@ -240,76 +245,6 @@ struct WidgetView: View {
         x = minX <= maxX ? min(max(x, minX), maxX) : area.midX
         y = minY <= maxY ? min(max(y, minY), maxY) : area.midY
         return CGPoint(x: x, y: y)
-    }
-
-    // MARK: - 기본 스킨 (둥근 박스)
-
-    private var boxedWidget: some View {
-        VStack(spacing: 4 * s) {
-            CatView(skin: skins.skin, state: engine.state, scale: s)
-
-            Text(engine.displayText)
-                .font(settings.timerFontStyle.font(size: 26 * s, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(timeColor(base: settings.timerFillColor))
-                .contentTransition(.numericText())
-                .animation(.default, value: engine.displayText)
-                .opacity(showsCount ? 1 : 0)
-                .animation(.easeInOut(duration: 0.15), value: showsCount)
-
-            Text(engine.subtitle)
-                .font(.system(size: 11 * s, weight: .medium))
-                .foregroundStyle(.white.opacity(0.65))
-
-            ProgressView(value: engine.progress)
-                .progressViewStyle(.linear)
-                .tint(engine.state == .done ? .red : .white)
-                .frame(width: 110 * s)
-                .opacity(engine.total > 0 ? 0.8 : 0.2)
-
-            controls
-        }
-        .padding(16 * s)
-        .frame(width: bw, height: bh)
-        .background(
-            RoundedRectangle(cornerRadius: 22 * s, style: .continuous)
-                .fill(.black.opacity(0.55))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22 * s, style: .continuous)
-                .stroke(engine.isAlerting ? .red : .white.opacity(0.15),
-                        lineWidth: (engine.isAlerting ? 3 : 1) * s)
-                .opacity(engine.isAlerting && pulse ? 0.3 : 1)
-        )
-        .padding(8 * s)
-    }
-
-    @ViewBuilder
-    private var controls: some View {
-        if engine.isAlerting {
-            Button {
-                engine.acknowledge()
-            } label: {
-                Label("끄기", systemImage: "bell.slash.fill")
-                    .font(.system(size: 13 * s, weight: .bold))
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
-        } else {
-            HStack(spacing: 14 * s) {
-                Button(action: engine.toggle) {
-                    Image(systemName: playPauseIcon)
-                }
-                Button(action: engine.reset) {
-                    Image(systemName: "arrow.counterclockwise")
-                }
-            }
-            .font(.system(size: 15 * s, weight: .semibold))
-            .buttonStyle(.plain)
-            .foregroundStyle(.white)
-            .opacity(showsControls ? 1 : 0)
-            .animation(.easeInOut(duration: 0.15), value: showsControls)
-        }
     }
 
     private var playPauseIcon: String {
