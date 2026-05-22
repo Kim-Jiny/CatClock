@@ -126,7 +126,7 @@ cat > "$ITEM_FILE" <<EOF
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:releaseNotesLink>${RELEASE_NOTES_URL}</sparkle:releaseNotesLink>
       <pubDate>${PUB_DATE}</pubDate>
-      <enclosure url="${ZIP_URL}" length="${ZIP_LEN}" type="application/octet-stream" ${SIG_LINE} />
+      <enclosure url="${ZIP_URL}" type="application/octet-stream" ${SIG_LINE} />
     </item>
 EOF
 
