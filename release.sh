@@ -114,22 +114,24 @@ ZIP_LEN="$(stat -f%z "$ZIP_VER")"
 RELEASE_NOTES_URL="${BASE_URL}/releases/v${VERSION}/"
 ZIP_URL="${BASE_URL}/CatClock-${VERSION}.zip"
 
-ITEM="    <item>
+# sentinel 라인 바로 아래에 새 <item> 삽입. multi-line 문자열은 awk -v 가
+# BSD/macOS 에서 깨지므로 임시 파일 + sed 의 'r' 명령으로 처리.
+ITEM_FILE="$(mktemp)"
+trap 'rm -f "$ITEM_FILE"' EXIT
+cat > "$ITEM_FILE" <<EOF
+    <item>
       <title>Version ${VERSION}</title>
       <sparkle:version>${NEW_BUILD}</sparkle:version>
       <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:releaseNotesLink>${RELEASE_NOTES_URL}</sparkle:releaseNotesLink>
       <pubDate>${PUB_DATE}</pubDate>
-      <enclosure url=\"${ZIP_URL}\" length=\"${ZIP_LEN}\" type=\"application/octet-stream\" ${SIG_LINE} />
-    </item>"
+      <enclosure url="${ZIP_URL}" length="${ZIP_LEN}" type="application/octet-stream" ${SIG_LINE} />
+    </item>
+EOF
 
-# sentinel 라인 바로 아래에 ITEM 삽입. awk 로 in-place 치환.
 TMP_APPCAST="$(mktemp)"
-awk -v item="$ITEM" '
-  /<!-- AUTO-INSERT-BELOW -->/ { print; print item; next }
-  { print }
-' "$APPCAST" > "$TMP_APPCAST"
+sed "/<!-- AUTO-INSERT-BELOW -->/r ${ITEM_FILE}" "$APPCAST" > "$TMP_APPCAST"
 if ! grep -q "<title>Version ${VERSION}</title>" "$TMP_APPCAST"; then
   echo "✗ appcast 에 새 item 이 삽입되지 않음. sentinel '<!-- AUTO-INSERT-BELOW -->' 가 파일에 있는지 확인하세요."
   rm "$TMP_APPCAST"

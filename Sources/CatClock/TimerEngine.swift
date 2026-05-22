@@ -59,15 +59,9 @@ final class TimerEngine {
 
     // MARK: - 표시
 
-    /// "HH:MM:SS" 또는 "MM:SS" 형태.
+    /// 사용자가 고른 형식대로 남은 시간 텍스트 반환.
     var displayText: String {
-        let secs = max(0, Int(remaining.rounded()))
-        let h = secs / 3600
-        let m = (secs % 3600) / 60
-        let s = secs % 60
-        return h > 0
-            ? String(format: "%d:%02d:%02d", h, m, s)
-            : String(format: "%02d:%02d", m, s)
+        Settings.shared.timerDisplayFormat.format(seconds: Int(remaining.rounded()))
     }
 
     /// 위젯 하단 부제. 모드/상태 한 줄 설명.

@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @State private var engine = TimerEngine.shared
     @State private var skins = SkinStore.shared
+    @State private var layout = LayoutStore.shared
+    private let settings = Settings.shared  // @Observable: SwiftUI 가 read 자동 추적
 
     // 큰 분류: 집중용 / 출퇴근용
     @State private var category: Category = .focus
@@ -19,10 +21,7 @@ struct SettingsView: View {
     @State private var workMinutes = 0
 
     @State private var launchAtLogin = LoginItem.isEnabled
-    @State private var autoStart = Settings.shared.autoStartOnLaunch
-    @State private var soundOnFinish = Settings.shared.soundOnFinish
     @State private var loginError = false
-    @State private var layout = LayoutStore.shared
 
     enum Category: String, CaseIterable { case focus = "집중용", commute = "출퇴근용" }
     enum OffKind: String, CaseIterable { case clock = "목표 시각", duration = "근무 시간" }
@@ -30,9 +29,35 @@ struct SettingsView: View {
     var onClose: () -> Void = {}
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("타이머 설정").font(.title3.bold())
+        VStack(spacing: 0) {
+            TabView {
+                timerTab
+                    .tabItem { Label("타이머", systemImage: "timer") }
+                displayTab
+                    .tabItem { Label("표시", systemImage: "paintbrush") }
+                alertTab
+                    .tabItem { Label("알림", systemImage: "bell") }
+                runTab
+                    .tabItem { Label("실행", systemImage: "power") }
+                catTab
+                    .tabItem { Label("고양이", systemImage: "cat") }
+            }
 
+            HStack {
+                Spacer()
+                Button("닫기") { onClose() }
+                    .keyboardShortcut(.cancelAction)
+            }
+            .padding(16)
+        }
+        .frame(width: 420, height: 520)
+        .onAppear(perform: loadFromEngine)
+    }
+
+    // MARK: - 탭 컨테이너
+
+    private var timerTab: some View {
+        tabScroll {
             Picker("", selection: $category) {
                 ForEach(Category.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
@@ -44,30 +69,32 @@ struct SettingsView: View {
             case .commute: commuteSection
             }
 
-            Divider()
-            displaySection
-
-            Divider()
-            alertSection
-
-            Divider()
-            autoLaunchSection
-
-            Divider()
-            catSection
-
             HStack {
                 Spacer()
-                Button("닫기") { onClose() }
                 Button("적용 후 시작") {
                     apply(); engine.reset(); engine.start(); onClose()
                 }
                 .keyboardShortcut(.defaultAction)
             }
+            .padding(.top, 4)
         }
-        .padding(20)
-        .frame(width: 360)
-        .onAppear(perform: loadFromEngine)
+    }
+
+    private var displayTab: some View { tabScroll { displaySection } }
+    private var alertTab: some View   { tabScroll { alertSection } }
+    private var runTab: some View     { tabScroll { autoLaunchSection } }
+    private var catTab: some View     { tabScroll { catSection } }
+
+    /// 탭 공통 컨테이너: 스크롤 + 좌측 정렬 + 일관 패딩.
+    @ViewBuilder
+    private func tabScroll<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+        }
     }
 
     // MARK: - 집중용
@@ -129,8 +156,10 @@ struct SettingsView: View {
 
     // MARK: - 표시 옵션
 
+    @ViewBuilder
     private var displaySection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        @Bindable var settings = settings
+        VStack(alignment: .leading, spacing: 8) {
             Toggle("카운트는 마우스 올렸을 때만 표시",
                    isOn: Binding(
                     get: { layout.hideCountUnlessHover },
@@ -138,17 +167,77 @@ struct SettingsView: View {
                    ))
             Text("위젯에 마우스를 올리지 않으면 시간 숫자가 숨겨져요. 알람 중에는 항상 보입니다.")
                 .font(.caption).foregroundStyle(.secondary)
+
+            HStack {
+                Text("시간 표시 형식")
+                Spacer()
+                Picker("", selection: $settings.timerDisplayFormat) {
+                    ForEach(TimerDisplayFormat.allCases) { fmt in
+                        Text(fmt.title).tag(fmt)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(maxWidth: 220)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("타이머 글씨체")
+                fontStyleGrid
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("타이머 색상")
+                HStack {
+                    Text("글씨 색")
+                    Spacer()
+                    ColorPicker("", selection: $settings.timerFillColor, supportsOpacity: false)
+                        .labelsHidden()
+                }
+                HStack {
+                    Text("외곽선 색")
+                    Spacer()
+                    ColorPicker("", selection: $settings.timerStrokeColor, supportsOpacity: false)
+                        .labelsHidden()
+                        .disabled(!settings.timerShowOutline)
+                }
+                Toggle("외곽선 표시", isOn: $settings.timerShowOutline)
+                Text("일시정지(노랑) / 종료(빨강) 색상은 상태 강조용으로 고정이에요.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var fontStyleGrid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 8) {
+            ForEach(TimerFontStyle.allCases) { style in
+                selectableCard(
+                    isSelected: settings.timerFontStyle == style,
+                    onTap: { settings.timerFontStyle = style }
+                ) {
+                    VStack(spacing: 2) {
+                        Text("12:34")
+                            .font(style.font(size: 22, weight: .bold))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        Text(style.title)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
         }
     }
 
     // MARK: - 알림
 
+    @ViewBuilder
     private var alertSection: some View {
+        @Bindable var settings = settings
         VStack(alignment: .leading, spacing: 6) {
-            Toggle("완료 시 소리 알림", isOn: $soundOnFinish)
-                .onChange(of: soundOnFinish) { _, on in
-                    Settings.shared.soundOnFinish = on
-                }
+            Toggle("완료 시 소리 알림", isOn: $settings.soundOnFinish)
             Text("끄면 시각 알림(위젯 깜빡임)만 유지돼요. 4초 간격 반복 소리도 같이 꺼집니다.")
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -156,17 +245,16 @@ struct SettingsView: View {
 
     // MARK: - 자동 실행
 
+    @ViewBuilder
     private var autoLaunchSection: some View {
+        @Bindable var settings = settings
         VStack(alignment: .leading, spacing: 6) {
             Toggle("로그인 시 CatClock 자동 실행", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, on in
                     loginError = !LoginItem.set(on)
                     if loginError { launchAtLogin = LoginItem.isEnabled }
                 }
-            Toggle("실행되면 자동으로 타이머 시작", isOn: $autoStart)
-                .onChange(of: autoStart) { _, on in
-                    Settings.shared.autoStartOnLaunch = on
-                }
+            Toggle("실행되면 자동으로 타이머 시작", isOn: $settings.autoStartOnLaunch)
             Text("둘 다 켜면: 로그인 → CatClock 자동 실행 → 위 타이머 자동 시작 (출퇴근용에 딱).")
                 .font(.caption).foregroundStyle(.secondary)
             if loginError {
@@ -189,22 +277,17 @@ struct SettingsView: View {
             Text("고양이 종류").font(.headline)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 10) {
                 ForEach(CatSkin.all) { s in
-                    VStack(spacing: 4) {
-                        CatView(skin: s, state: .idle).scaleEffect(0.7).frame(height: 56)
-                        Text(s.name).font(.caption)
+                    selectableCard(
+                        isSelected: skins.selectedID == s.id,
+                        cornerRadius: 10,
+                        onTap: { skins.selectedID = s.id }
+                    ) {
+                        VStack(spacing: 4) {
+                            CatView(skin: s, state: .idle).scaleEffect(0.7).frame(height: 56)
+                            Text(s.name).font(.caption)
+                        }
+                        .padding(.vertical, 6)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(skins.selectedID == s.id ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(skins.selectedID == s.id ? Color.accentColor : .clear, lineWidth: 2)
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture { skins.selectedID = s.id }
                 }
             }
 
@@ -246,6 +329,27 @@ struct SettingsView: View {
         }
     }
 
+    /// 그리드 셀 공통: 선택 시 액센트 강조 + 탭 영역. 글씨체·고양이 스킨 둘 다 사용.
+    private func selectableCard<Content: View>(
+        isSelected: Bool,
+        cornerRadius: CGFloat = 8,
+        onTap: @escaping () -> Void,
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        content()
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(isSelected ? Color.accentColor.opacity(0.25) : Color.gray.opacity(0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 2)
+            )
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onTap)
+    }
+
     private func pickImage() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.png, .jpeg, .tiff, .image]
@@ -282,8 +386,6 @@ struct SettingsView: View {
             category = .commute; offKind = .duration; workHours = h; workMinutes = mm
         }
         launchAtLogin = LoginItem.isEnabled
-        autoStart = Settings.shared.autoStartOnLaunch
-        soundOnFinish = Settings.shared.soundOnFinish
     }
 
     private func apply() {

@@ -13,17 +13,20 @@ struct WidgetView: View {
     @State private var pulse = false
     @State private var dragStartTimerPos: CGPoint?
     @State private var dragStartFont: CGFloat?
+    private let settings = Settings.shared
 
     private var s: CGFloat { layout.scale }
     private var bw: CGFloat { LayoutStore.baseSize.width * s }
     private var bh: CGFloat { LayoutStore.baseSize.height * s }
 
-    private var timeColor: Color {
+    /// 상태별 글씨 색. paused 노랑·done 빨강은 상태 강조용으로 고정,
+    /// running/idle 만 사용자가 지정한 색.
+    private func timeColor(base: Color) -> Color {
         switch engine.state {
         case .done:    return .red
-        case .running: return .white
+        case .running: return base
         case .paused:  return .yellow
-        case .idle:    return .white.opacity(0.7)
+        case .idle:    return base.opacity(0.7)
         }
     }
 
@@ -117,8 +120,13 @@ struct WidgetView: View {
             OutlinedText(
                 text: engine.displayText,
                 size: layout.timerFontSize * s,
-                fill: engine.state == .done ? .red : .white,
-                lineWidth: max(2, layout.timerFontSize * s * 0.09)
+                style: TimerTextStyle(
+                    fill: timeColor(base: settings.timerFillColor),
+                    stroke: settings.timerStrokeColor,
+                    lineWidth: max(2, layout.timerFontSize * s * 0.09),
+                    font: settings.timerFontStyle,
+                    showOutline: settings.timerShowOutline
+                )
             )
             .opacity(showsCount ? (engine.isAlerting && pulse ? 0.45 : 1) : 0)
             .animation(.easeInOut(duration: 0.15), value: showsCount)
@@ -241,9 +249,9 @@ struct WidgetView: View {
             CatView(skin: skins.skin, state: engine.state, scale: s)
 
             Text(engine.displayText)
-                .font(.system(size: 26 * s, weight: .bold, design: .rounded))
+                .font(settings.timerFontStyle.font(size: 26 * s, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(timeColor)
+                .foregroundStyle(timeColor(base: settings.timerFillColor))
                 .contentTransition(.numericText())
                 .animation(.default, value: engine.displayText)
                 .opacity(showsCount ? 1 : 0)
