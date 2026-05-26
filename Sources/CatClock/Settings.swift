@@ -36,6 +36,21 @@ extension Color {
     }
 }
 
+/// 위젯에 표시할 내용. 타이머 카운트다운 / 현재 시각.
+enum WidgetMode: String, CaseIterable, Identifiable {
+    case timer
+    case clock
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .timer: return "타이머"
+        case .clock: return "시계"
+        }
+    }
+}
+
 /// 타이머 숫자 글씨체.
 enum TimerFontStyle: String, CaseIterable, Identifiable {
     case rounded       // SF Rounded (기본)
@@ -167,6 +182,11 @@ final class Settings {
         static let timerFillColorHex = "timerFillColorHex"
         static let timerStrokeColorHex = "timerStrokeColorHex"
         static let timerShowOutline = "timerShowOutline"
+        static let widgetMode = "widgetMode"
+        static let clockUse24Hour = "clockUse24Hour"
+        static let clockShowSeconds = "clockShowSeconds"
+        static let clockShowAMPM = "clockShowAMPM"
+        static let clockTimeZoneID = "clockTimeZoneID"
     }
 
     var displayMode: DisplayMode {
@@ -225,6 +245,26 @@ final class Settings {
     var timerShowOutline: Bool {
         didSet { defaults.set(timerShowOutline, forKey: Key.timerShowOutline) }
     }
+    /// 위젯에 표시할 내용: 타이머 / 시계.
+    var widgetMode: WidgetMode {
+        didSet { defaults.set(widgetMode.rawValue, forKey: Key.widgetMode) }
+    }
+    /// 시계 모드에서 24시간제 사용 여부 (꺼지면 12시간제 + AM/PM).
+    var clockUse24Hour: Bool {
+        didSet { defaults.set(clockUse24Hour, forKey: Key.clockUse24Hour) }
+    }
+    /// 시계 모드에서 초 표시 여부.
+    var clockShowSeconds: Bool {
+        didSet { defaults.set(clockShowSeconds, forKey: Key.clockShowSeconds) }
+    }
+    /// 12시간제일 때 AM/PM 접미사 표시 여부. 24시간제에서는 무시된다.
+    var clockShowAMPM: Bool {
+        didSet { defaults.set(clockShowAMPM, forKey: Key.clockShowAMPM) }
+    }
+    /// 시계 모드에서 사용할 IANA 시간대 식별자. nil 이면 디바이스 기본.
+    var clockTimeZoneID: String? {
+        didSet { defaults.set(clockTimeZoneID, forKey: Key.clockTimeZoneID) }
+    }
     /// 사용자가 넣은 고양이 사진 파일명(앱 지원 폴더 내).
     var customCatFileName: String? {
         didSet { defaults.set(customCatFileName, forKey: Key.customCatFileName) }
@@ -254,7 +294,10 @@ final class Settings {
         defaults.register(defaults: [
             Key.isWidgetVisible: true,
             Key.soundOnFinish: true,
-            Key.timerShowOutline: true
+            Key.timerShowOutline: true,
+            Key.clockUse24Hour: true,
+            Key.clockShowSeconds: false,
+            Key.clockShowAMPM: true
         ])
 
         displayMode = DisplayMode(rawValue: defaults.string(forKey: Key.displayMode) ?? "") ?? .alwaysOnTop
@@ -273,6 +316,11 @@ final class Settings {
         timerFillColor = Color(hexString: defaults.string(forKey: Key.timerFillColorHex) ?? "") ?? .white
         timerStrokeColor = Color(hexString: defaults.string(forKey: Key.timerStrokeColorHex) ?? "") ?? .black
         timerShowOutline = defaults.bool(forKey: Key.timerShowOutline)
+        widgetMode = WidgetMode(rawValue: defaults.string(forKey: Key.widgetMode) ?? "") ?? .timer
+        clockUse24Hour = defaults.bool(forKey: Key.clockUse24Hour)
+        clockShowSeconds = defaults.bool(forKey: Key.clockShowSeconds)
+        clockShowAMPM = defaults.bool(forKey: Key.clockShowAMPM)
+        clockTimeZoneID = defaults.string(forKey: Key.clockTimeZoneID)
         customCatFileName = defaults.string(forKey: Key.customCatFileName)
         catSkinID = defaults.string(forKey: Key.catSkinID)
         timerMode = (defaults.data(forKey: Key.timerMode))

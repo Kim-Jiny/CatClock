@@ -6,6 +6,7 @@ import SwiftUI
 /// 곱해 네이티브로 그린다**. 글자·이미지·아이콘이 어느 크기에서도 또렷하다.
 struct WidgetView: View {
     @State private var engine = TimerEngine.shared
+    @State private var clock = ClockEngine.shared
     @State private var skins = SkinStore.shared
     @State private var layout = LayoutStore.shared
     @State private var hovering = false
@@ -19,9 +20,17 @@ struct WidgetView: View {
     private var bw: CGFloat { LayoutStore.baseSize.width * s }
     private var bh: CGFloat { LayoutStore.baseSize.height * s }
 
+    private var isClockMode: Bool { settings.widgetMode == .clock }
+
+    /// 모드별 표시 텍스트. 시계 모드면 현재 시각, 그 외엔 타이머 카운트.
+    private var displayText: String {
+        isClockMode ? clock.displayText : engine.displayText
+    }
+
     /// 상태별 글씨 색. paused 노랑·done 빨강은 상태 강조용으로 고정,
-    /// running/idle 만 사용자가 지정한 색.
+    /// running/idle 만 사용자가 지정한 색. 시계 모드는 항상 사용자 색 그대로.
     private func timeColor(base: Color) -> Color {
+        if isClockMode { return base }
         switch engine.state {
         case .done:    return .red
         case .running: return base
@@ -30,16 +39,16 @@ struct WidgetView: View {
         }
     }
 
-    /// 카운트 표시 여부. 알람 중에는 옵션과 무관하게 강제로 보임.
+    /// 카운트 표시 여부. 타이머 모드의 알람 중에는 옵션과 무관하게 강제로 보임.
     private var showsCount: Bool {
-        if engine.isAlerting { return true }
+        if !isClockMode && engine.isAlerting { return true }
         return !layout.hideCountUnlessHover || hovering
     }
 
     /// 컨트롤(리사이즈/재생·정지·리셋/시간 위치 핸들) 표시 여부.
     /// 옵션이 켜졌으면 호버 + 클릭 후에만 노출. 옵션 꺼졌으면 기존대로 호버만으로 노출.
     private var showsControls: Bool {
-        if engine.isAlerting { return true }
+        if !isClockMode && engine.isAlerting { return true }
         if layout.hideCountUnlessHover {
             return hovering && revealed
         }
@@ -97,7 +106,7 @@ struct WidgetView: View {
 
             // 이동·크기 가능한 시간(네이티브 크기로 그려서 또렷함).
             OutlinedText(
-                text: engine.displayText,
+                text: displayText,
                 size: layout.timerFontSize * s,
                 style: TimerTextStyle(
                     fill: timeColor(base: settings.timerFillColor),
@@ -107,7 +116,7 @@ struct WidgetView: View {
                     showOutline: settings.timerShowOutline
                 )
             )
-            .opacity(showsCount ? (engine.isAlerting && pulse ? 0.45 : 1) : 0)
+            .opacity(showsCount ? (!isClockMode && engine.isAlerting && pulse ? 0.45 : 1) : 0)
             .animation(.easeInOut(duration: 0.15), value: showsCount)
             .overlay(alignment: .bottomTrailing) {
                 timerHandles.allowsHitTesting(showsControls)
@@ -133,7 +142,7 @@ struct WidgetView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: bw, height: bh)
-                    .scaleEffect(engine.state == .done ? 1.04 : 1)
+                    .scaleEffect(!isClockMode && engine.state == .done ? 1.04 : 1)
                     .animation(.spring(duration: 0.35), value: engine.state)
             } else {
                 VStack(spacing: 4 * s) {
@@ -146,7 +155,8 @@ struct WidgetView: View {
             }
         } else {
             // 위젯 크기에 어울리게 키워 표시. CatView 자체는 height 70*scale 기준.
-            CatView(skin: skins.skin, state: engine.state, scale: s * 1.6)
+            // 시계 모드는 타이머 진행 상태와 무관하므로 idle 한 모습 유지.
+            CatView(skin: skins.skin, state: isClockMode ? .idle : engine.state, scale: s * 1.6)
         }
     }
 
@@ -191,7 +201,9 @@ struct WidgetView: View {
 
     @ViewBuilder
     private var controls: some View {
-        if engine.isAlerting {
+        if isClockMode {
+            EmptyView()
+        } else if engine.isAlerting {
             Button {
                 engine.acknowledge()
             } label: {
@@ -236,7 +248,7 @@ struct WidgetView: View {
     private func clampedTimerCenter(in area: CGRect) -> CGPoint {
         let base = LayoutStore.baseSize
         let fs = layout.timerFontSize
-        let halfW = CGFloat(engine.displayText.count) * fs * 0.31
+        let halfW = CGFloat(displayText.count) * fs * 0.31
         let halfH = fs * 0.62
         var x = layout.timerPos.x * base.width
         var y = layout.timerPos.y * base.height

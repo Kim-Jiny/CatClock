@@ -32,7 +32,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             TabView {
                 timerTab
-                    .tabItem { Label("타이머", systemImage: "timer") }
+                    .tabItem { Label("모드", systemImage: "clock") }
                 displayTab
                     .tabItem { Label("표시", systemImage: "paintbrush") }
                 alertTab
@@ -56,8 +56,27 @@ struct SettingsView: View {
 
     // MARK: - 탭 컨테이너
 
+    @ViewBuilder
     private var timerTab: some View {
+        @Bindable var settings = settings
         tabScroll {
+            Picker("", selection: $settings.widgetMode) {
+                ForEach(WidgetMode.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            switch settings.widgetMode {
+            case .clock:
+                clockSection
+            case .timer:
+                timerModeBody
+            }
+        }
+    }
+
+    private var timerModeBody: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Picker("", selection: $category) {
                 ForEach(Category.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
@@ -78,6 +97,50 @@ struct SettingsView: View {
             }
             .padding(.top, 4)
         }
+    }
+
+    @ViewBuilder
+    private var clockSection: some View {
+        @Bindable var settings = settings
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("지역")
+                Spacer()
+                Picker("", selection: $settings.clockTimeZoneID) {
+                    Text("디바이스 기본 (\(deviceTZLabel))").tag(String?.none)
+                    ForEach(ClockRegion.groups, id: \.self) { group in
+                        Section(group) {
+                            ForEach(regionsByGroup[group] ?? []) { r in
+                                Text("\(r.name)  (\(ClockRegion.offsetLabel(for: TimeZone(identifier: r.id) ?? .current)))")
+                                    .tag(String?(r.id))
+                            }
+                        }
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(maxWidth: 240)
+            }
+
+            Toggle("24시간제", isOn: $settings.clockUse24Hour)
+            Toggle("AM/PM 표시", isOn: $settings.clockShowAMPM)
+                .disabled(settings.clockUse24Hour)
+            Toggle("초 표시", isOn: $settings.clockShowSeconds)
+
+            Text("현재 시각을 표시하는 모드예요. 시작/정지 같은 타이머 컨트롤은 숨겨집니다.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    /// 지역 묶음별 캐시. 메뉴 그릴 때 매번 필터링하지 않게.
+    private var regionsByGroup: [String: [ClockRegion]] {
+        Dictionary(grouping: ClockRegion.all, by: \.group)
+    }
+
+    /// "Asia/Seoul, UTC+9" 형태의 디바이스 시간대 라벨.
+    private var deviceTZLabel: String {
+        let tz = TimeZone.current
+        return "\(tz.identifier), \(ClockRegion.offsetLabel(for: tz))"
     }
 
     private var displayTab: some View { tabScroll { displaySection } }
