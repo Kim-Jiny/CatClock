@@ -321,7 +321,7 @@ struct SettingsView: View {
             Text("둘 다 켜면: 로그인 → CatClock 자동 실행 → 위 타이머 자동 시작 (출퇴근용에 딱).")
                 .font(.caption).foregroundStyle(.secondary)
             if loginError {
-                Text("⚠︎ 로그인 항목 등록 실패 — 정식 .app으로 실행해야 적용돼요 (build_app.sh).")
+                Text("⚠︎ 로그인 항목 등록 실패 — /Applications 의 정식 서명된 CatClock 에서만 동작합니다.")
                     .font(.caption).foregroundStyle(.orange)
             }
             if !LoginItem.isSupported {

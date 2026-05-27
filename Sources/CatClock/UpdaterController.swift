@@ -1,4 +1,6 @@
 import AppKit
+
+#if !APPSTORE
 import Sparkle
 
 @MainActor
@@ -22,3 +24,13 @@ final class UpdaterController {
         controller.checkForUpdates(sender)
     }
 }
+#else
+// MAS 빌드에서는 Sparkle 자동 업데이트를 사용하지 않는다 (스토어가 처리).
+// 호출부 분기를 줄이기 위한 no-op 스텁.
+@MainActor
+final class UpdaterController {
+    static let shared = UpdaterController()
+    private init() {}
+    func checkForUpdates(_ sender: Any?) {}
+}
+#endif

@@ -1,9 +1,10 @@
 #!/bin/bash
-# CatClock.app 번들 생성/갱신 스크립트.
-#   ./build_app.sh            → ./CatClock.app 생성·갱신
+# CatClock.app — 직접배포(개인 서버/DMG) 용 로컬 빌드 스크립트.
+#   ./build_app.sh            → ./CatClock.app 생성·갱신 (ad-hoc 서명)
 #   ./build_app.sh --install  → 위 + /Applications 에 설치
 #
 # 평소 개발은 `swift run`. 실제로 쓸 버전이 되면 이 스크립트 한 번 돌리면 됨.
+# 외부 배포(공증·DMG) 는 release_dmg.sh, App Store 빌드는 build_app_mas.sh 참고.
 set -euo pipefail
 cd "$(dirname "$0")"
 

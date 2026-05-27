@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- MAS 필수: App Sandbox 활성화 -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+
+    <!-- 사용자가 NSOpenPanel 로 직접 고른 사진을 읽어 ~/Library/Application Support/CatClock 로 복사 -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+</dict>
+</plist>

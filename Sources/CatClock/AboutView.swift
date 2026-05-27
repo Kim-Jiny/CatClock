@@ -100,8 +100,11 @@ private final class ShortVersionParserDelegate: NSObject, XMLParserDelegate {
 
 struct AboutView: View {
     @StateObject private var viewModel = AboutViewModel()
-    var onUpdate: () -> Void
+    /// nil 이면 자체 업데이트 채널을 사용하지 않는 빌드(MAS) — "최신 버전/업데이트" 영역을 숨긴다.
+    var onUpdate: (() -> Void)?
     var onClose: () -> Void
+
+    private var showsUpdateChannel: Bool { onUpdate != nil }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -118,20 +121,22 @@ struct AboutView: View {
 
             VStack(spacing: 8) {
                 row(label: "현재 버전", value: viewModel.currentVersion)
-                Divider()
-                HStack {
-                    Text("최신 버전").foregroundStyle(.secondary)
-                    Spacer()
-                    if viewModel.loading {
-                        ProgressView().controlSize(.small)
-                    } else if let latest = viewModel.latestVersion {
-                        Text(latest)
-                    } else if let err = viewModel.errorMessage {
-                        Text("확인 실패")
-                            .foregroundStyle(.red)
-                            .help(err)
-                    } else {
-                        Text("—").foregroundStyle(.secondary)
+                if showsUpdateChannel {
+                    Divider()
+                    HStack {
+                        Text("최신 버전").foregroundStyle(.secondary)
+                        Spacer()
+                        if viewModel.loading {
+                            ProgressView().controlSize(.small)
+                        } else if let latest = viewModel.latestVersion {
+                            Text(latest)
+                        } else if let err = viewModel.errorMessage {
+                            Text("확인 실패")
+                                .foregroundStyle(.red)
+                                .help(err)
+                        } else {
+                            Text("—").foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -142,17 +147,19 @@ struct AboutView: View {
                     .fill(Color(nsColor: .controlBackgroundColor))
             )
 
-            if viewModel.hasUpdate {
-                Button(action: onUpdate) {
-                    Text("지금 업데이트")
-                        .frame(maxWidth: .infinity)
+            if showsUpdateChannel {
+                if viewModel.hasUpdate, let onUpdate {
+                    Button(action: onUpdate) {
+                        Text("지금 업데이트")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                } else if !viewModel.loading, viewModel.latestVersion != nil {
+                    Text("최신 버전을 사용 중입니다")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-            } else if !viewModel.loading, viewModel.latestVersion != nil {
-                Text("최신 버전을 사용 중입니다")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             HStack {
@@ -163,7 +170,9 @@ struct AboutView: View {
         }
         .padding(20)
         .frame(width: 320)
-        .task { await viewModel.refresh() }
+        .task {
+            if showsUpdateChannel { await viewModel.refresh() }
+        }
     }
 
     @ViewBuilder

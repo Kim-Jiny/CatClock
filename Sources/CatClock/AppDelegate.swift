@@ -12,8 +12,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = Settings.shared
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if !APPSTORE
         // Sparkle 업데이터 초기화: startingUpdater=true 라 시동 시 + 24시간 주기 자동 체크 시작.
+        // MAS 빌드는 스토어가 업데이트를 처리하므로 초기화하지 않는다.
         _ = UpdaterController.shared
+        #endif
         setupPanel()
         setupMenuBar()
 
@@ -203,8 +206,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openAbout() {
         if aboutWindow == nil {
+            #if APPSTORE
+            let onUpdate: (() -> Void)? = nil
+            #else
+            let onUpdate: (() -> Void)? = { [weak self] in self?.checkForUpdates() }
+            #endif
             let view = AboutView(
-                onUpdate: { [weak self] in self?.checkForUpdates() },
+                onUpdate: onUpdate,
                 onClose: { [weak self] in self?.aboutWindow?.close() }
             )
             let controller = NSHostingController(rootView: view)
