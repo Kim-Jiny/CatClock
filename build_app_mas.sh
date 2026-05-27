@@ -67,6 +67,10 @@ if [ -n "${MAS_PROFILE:-}" ] && [ -f "$MAS_PROFILE" ]; then
   echo "▶︎ provisioning profile 임베드: $MAS_PROFILE"
 fi
 
+# 다운로드한 .provisionprofile 등에 붙은 com.apple.quarantine 등 확장 속성 제거.
+# App Store 는 패키지 내 파일에 quarantine 속성이 있으면 91109 로 거부한다.
+xattr -cr "$APP"
+
 # --- 3. 서명 (hardened runtime 은 MAS 에서는 옵션이지만 권장) ---
 echo "▶︎ 코드서명…"
 if [ "$APP_SIGN_ID" = "-" ]; then
