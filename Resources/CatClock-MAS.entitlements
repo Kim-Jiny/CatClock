@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- 프로비저닝 프로파일과 매칭 필수 (TestFlight/App Store) -->
+    <key>com.apple.application-identifier</key>
+    <string>HW9XJ9J5M2.com.jiny.catclock.mas</string>
+    <key>com.apple.developer.team-identifier</key>
+    <string>HW9XJ9J5M2</string>
+
     <!-- MAS 필수: App Sandbox 활성화 -->
     <key>com.apple.security.app-sandbox</key>
     <true/>
