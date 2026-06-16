@@ -13,6 +13,6 @@ final class SkinStore {
     var skin: CatSkin { CatSkin.skin(id: selectedID) }
 
     private init() {
-        self.selectedID = Settings.shared.catSkinID ?? CatSkin.all[0].id
+        self.selectedID = Settings.shared.catSkinID ?? CatSkin.defaultSkin.id
     }
 }

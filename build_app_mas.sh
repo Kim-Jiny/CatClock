@@ -61,6 +61,11 @@ cp Resources/AppIcon.icns "${APP}/Contents/Resources/AppIcon.icns"
 cp "$BIN" "${APP}/Contents/MacOS/${APP_NAME}"
 chmod +x "${APP}/Contents/MacOS/${APP_NAME}"
 
+# SwiftPM 리소스 번들(기본 고양이 이미지 등) 복사.
+for b in .build/release/*.bundle; do
+    [ -e "$b" ] && cp -R "$b" "${APP}/Contents/Resources/"
+done
+
 # 임베디드 프로비저닝 프로파일이 있으면 복사
 if [ -n "${MAS_PROFILE:-}" ] && [ -f "$MAS_PROFILE" ]; then
   cp "$MAS_PROFILE" "${APP}/Contents/embedded.provisionprofile"

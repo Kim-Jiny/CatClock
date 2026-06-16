@@ -61,6 +61,11 @@ cp Resources/AppIcon.icns "${APP}/Contents/Resources/AppIcon.icns"
 cp "$BIN" "${APP}/Contents/MacOS/${APP_NAME}"
 chmod +x "${APP}/Contents/MacOS/${APP_NAME}"
 
+# SwiftPM 리소스 번들(기본 고양이 이미지 등) 복사. 빠지면 기본 고양이가 사라진다.
+for b in .build/release/*.bundle; do
+    [ -e "$b" ] && cp -R "$b" "${APP}/Contents/Resources/"
+done
+
 # Sparkle.framework 임베드: SwiftPM 은 .app 번들 임베딩을 안 해줘서 수동 복사.
 SPARKLE_FW_SRC=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 [ -d "$SPARKLE_FW_SRC" ] || { echo "✗ Sparkle.framework 빌드 산출물 없음: $SPARKLE_FW_SRC"; exit 1; }
@@ -86,6 +91,10 @@ codesign --force --options runtime --timestamp --sign "$DEV_ID" \
          "${SPARKLE_VER_DIR}/Updater.app"
 codesign --force --options runtime --timestamp --sign "$DEV_ID" \
          "$SPARKLE_FW"
+# 리소스 번들(고양이 이미지)도 봉인 일관성을 위해 서명.
+for b in "${APP}/Contents/Resources/"*.bundle; do
+    [ -e "$b" ] && codesign --force --options runtime --timestamp --sign "$DEV_ID" "$b"
+done
 codesign --force --options runtime --timestamp --sign "$DEV_ID" \
          "${APP}/Contents/MacOS/${APP_NAME}"
 codesign --force --options runtime --timestamp --sign "$DEV_ID" \

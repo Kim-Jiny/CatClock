@@ -25,6 +25,11 @@ cp Resources/AppIcon.icns "${APP}/Contents/Resources/AppIcon.icns"
 cp "$BIN" "${APP}/Contents/MacOS/${APP_NAME}"
 chmod +x "${APP}/Contents/MacOS/${APP_NAME}"
 
+# SwiftPM 리소스 번들(기본 고양이 이미지 등) 복사.
+for b in .build/release/*.bundle; do
+    [ -e "$b" ] && cp -R "$b" "${APP}/Contents/Resources/"
+done
+
 # 로그인 항목/권한이 안정적으로 유지되도록 ad-hoc 서명.
 echo "▶︎ ad-hoc 코드서명…"
 codesign --force --deep --sign - "$APP"

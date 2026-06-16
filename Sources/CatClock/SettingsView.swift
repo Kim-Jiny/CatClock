@@ -334,6 +334,14 @@ struct SettingsView: View {
     // MARK: - 고양이
 
     @State private var customTick = 0  // 사진 변경 후 미리보기 갱신용
+    @State private var editing: EditingItem?
+
+    /// 편집 시트에 넘길 대상(보관함 파일명 + 이미지).
+    struct EditingItem: Identifiable {
+        let id = UUID()
+        let file: String
+        let image: NSImage
+    }
 
     private var catSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -356,40 +364,135 @@ struct SettingsView: View {
 
             Divider()
 
-            // 내 고양이 사진 (투명 PNG면 모양대로만 보임)
-            HStack(spacing: 12) {
-                Group {
-                    if let img = CustomCat.load() {
-                        Image(nsImage: img).resizable().scaledToFit()
-                    } else {
-                        Image(systemName: "photo").foregroundStyle(.secondary)
-                    }
-                }
-                .id(customTick)
-                .frame(width: 52, height: 52)
-                .background(RoundedRectangle(cornerRadius: 8).fill(.gray.opacity(0.15)))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(skins.selectedID == CustomCat.skinID ? Color.accentColor : .clear, lineWidth: 2)
-                )
-                .onTapGesture {
-                    if CustomCat.hasImage { skins.selectedID = CustomCat.skinID }
-                }
+            catRotationControl
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("내 고양이 사진").font(.subheadline.bold())
-                    Text("투명 배경 PNG를 넣으면 박스 없이 모양대로 떠요.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    HStack {
-                        Button("사진 고르기…", action: pickImage)
-                        if CustomCat.hasImage {
-                            Button("지우기", role: .destructive, action: clearImage)
-                        }
-                    }
-                }
+            Divider()
+
+            // 내 고양이 사진 보관함 (투명 PNG면 모양대로만 보임)
+            Text("내 고양이 사진").font(.subheadline.bold())
+            Text("등록한 사진은 보관함에 쌓여요. 평소 사진과 완료 사진을 골라 쓸 수 있어요.")
+                .font(.caption).foregroundStyle(.secondary)
+
+            photoLibraryGrid
+                .id(customTick)
+
+            HStack {
+                Button("사진 추가…", action: addPhoto)
                 Spacer()
             }
         }
+        .sheet(item: $editing) { item in
+            ImageEditorView(
+                original: item.image,
+                onCancel: { editing = nil },
+                onApply: { data in saveEdited(data, replacing: item.file); editing = nil }
+            )
+        }
+    }
+
+    /// 위젯 고양이 이미지 회전 각도 조절.
+    private var catRotationControl: some View {
+        let rotation = Binding(
+            get: { settings.catRotation },
+            set: { settings.catRotation = $0 }
+        )
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("고양이 회전").font(.subheadline.bold())
+                Spacer()
+                Text("\(Int(settings.catRotation.rounded()))°")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: rotation, in: 0...360, step: 1)
+            HStack(spacing: 8) {
+                ForEach([0, 90, 180, 270], id: \.self) { deg in
+                    Button("\(deg)°") { settings.catRotation = Double(deg) }
+                        .buttonStyle(.bordered)
+                }
+                Spacer()
+            }
+            Text("위젯의 고양이 이미지를 원하는 각도로 돌려 고정해요.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    /// 보관함 그리드. 각 사진을 탭하면 평소 사진으로, ⋯ 메뉴로 완료 지정·삭제.
+    @ViewBuilder
+    private var photoLibraryGrid: some View {
+        let files = CustomCat.libraryFiles()
+        if files.isEmpty {
+            HStack(spacing: 8) {
+                Image(systemName: "photo.on.rectangle.angled").foregroundStyle(.secondary)
+                Text("아직 등록한 사진이 없어요. 아래에서 사진을 추가하세요.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
+        } else {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
+                ForEach(files, id: \.self) { libraryCell($0) }
+            }
+        }
+    }
+
+    /// 보관함 사진 한 칸: 썸네일 + 역할 배지 + ⋯ 메뉴.
+    private func libraryCell(_ file: String) -> some View {
+        let isNormal = CustomCat.selected(.normal) == file
+        let isDone = CustomCat.selected(.done) == file
+        return ZStack(alignment: .topTrailing) {
+            Group {
+                if let img = CustomCat.image(named: file) {
+                    Image(nsImage: img).resizable().scaledToFit()
+                } else {
+                    Image(systemName: "photo").foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 64, height: 64)
+            .background(RoundedRectangle(cornerRadius: 8).fill(.gray.opacity(0.15)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isNormal ? Color.accentColor : .clear, lineWidth: 2)
+            )
+            .overlay(alignment: .bottomLeading) {
+                HStack(spacing: 2) {
+                    if isNormal { roleBadge("평소", .accentColor) }
+                    if isDone { roleBadge("완료", .red) }
+                }
+                .padding(3)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { assign(file, to: .normal) }
+
+            Menu {
+                Button("평소 사진으로") { assign(file, to: .normal) }
+                if isDone {
+                    Button("완료 사진 해제") { CustomCat.select(nil, for: .done); customTick += 1 }
+                } else {
+                    Button("완료 사진으로") { assign(file, to: .done) }
+                }
+                Divider()
+                Button("편집…") { startEdit(file) }
+                Button("보관함에서 삭제", role: .destructive) { removePhoto(file) }
+            } label: {
+                Image(systemName: "ellipsis.circle.fill")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .black.opacity(0.45))
+                    .font(.system(size: 16))
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .padding(3)
+        }
+    }
+
+    private func roleBadge(_ text: String, _ color: Color) -> some View {
+        Text(text)
+            .font(.system(size: 8, weight: .bold))
+            .padding(.horizontal, 4).padding(.vertical, 1)
+            .background(color, in: Capsule())
+            .foregroundStyle(.white)
     }
 
     /// 그리드 셀 공통: 선택 시 액센트 강조 + 탭 영역. 글씨체·고양이 스킨 둘 다 사용.
@@ -413,25 +516,51 @@ struct SettingsView: View {
             .onTapGesture(perform: onTap)
     }
 
-    private func pickImage() {
+    /// 보관함에 사진 추가(여러 장 가능). 평소 사진이 비어 있으면 첫 사진을 평소로 지정.
+    private func addPhoto() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.png, .jpeg, .tiff, .image]
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
-        panel.message = "위젯에 쓸 고양이 사진을 고르세요 (투명 PNG 권장)"
+        panel.message = "보관함에 추가할 고양이 사진을 고르세요 (투명 PNG 권장)"
         NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        if CustomCat.save(from: url) {
-            skins.selectedID = CustomCat.skinID
-            customTick += 1
+        guard panel.runModal() == .OK else { return }
+        var firstAdded: String?
+        for url in panel.urls {
+            if let name = CustomCat.add(from: url), firstAdded == nil { firstAdded = name }
         }
+        if CustomCat.selected(.normal) == nil, let f = firstAdded {
+            CustomCat.select(f, for: .normal)
+            skins.selectedID = CustomCat.skinID
+        }
+        customTick += 1
     }
 
-    private func clearImage() {
-        CustomCat.clear()
-        if skins.selectedID == CustomCat.skinID {
-            skins.selectedID = CatSkin.all[0].id
+    /// 보관함 사진을 평소/완료로 지정. 평소로 지정하면 커스텀 스킨도 함께 선택.
+    private func assign(_ file: String, to slot: CustomCat.Slot) {
+        CustomCat.select(file, for: slot)
+        if slot == .normal { skins.selectedID = CustomCat.skinID }
+        customTick += 1
+    }
+
+    private func removePhoto(_ file: String) {
+        CustomCat.remove(file)
+        if CustomCat.selected(.normal) == nil && skins.selectedID == CustomCat.skinID {
+            skins.selectedID = CatSkin.defaultSkin.id
         }
+        customTick += 1
+    }
+
+    private func startEdit(_ file: String) {
+        guard let img = CustomCat.image(named: file) else { return }
+        editing = EditingItem(file: file, image: img)
+    }
+
+    /// 편집 결과를 보관함에 새 사진으로 추가하고, 원본이 맡던 평소/완료 역할을 그쪽으로 옮긴다.
+    /// (원본 사진은 보관함에 그대로 남겨 둠)
+    private func saveEdited(_ data: Data, replacing old: String) {
+        guard let newName = CustomCat.addPNG(data) else { return }
+        CustomCat.transferRoles(from: old, to: newName)
         customTick += 1
     }
 

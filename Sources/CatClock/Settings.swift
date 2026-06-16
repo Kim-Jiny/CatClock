@@ -170,6 +170,8 @@ final class Settings {
         static let catSkinID = "catSkinID"
         static let autoStartOnLaunch = "autoStartOnLaunch"
         static let customCatFileName = "customCatFileName"
+        static let customCatDoneFileName = "customCatDoneFileName"
+        static let catRotation = "catRotation"
         static let widgetScale = "widgetScale"
         static let timerPosX = "timerPosX"
         static let timerPosY = "timerPosY"
@@ -269,6 +271,14 @@ final class Settings {
     var customCatFileName: String? {
         didSet { defaults.set(customCatFileName, forKey: Key.customCatFileName) }
     }
+    /// 타이머 완료 시 보여줄 고양이 사진 파일명. nil 이면 평소 사진 그대로 유지.
+    var customCatDoneFileName: String? {
+        didSet { defaults.set(customCatDoneFileName, forKey: Key.customCatDoneFileName) }
+    }
+    /// 위젯 고양이 이미지 회전 각도(도). 0이 기본.
+    var catRotation: Double {
+        didSet { defaults.set(catRotation, forKey: Key.catRotation) }
+    }
     /// 선택한 고양이 스킨 id.
     var catSkinID: String? {
         didSet { defaults.set(catSkinID, forKey: Key.catSkinID) }
@@ -322,6 +332,8 @@ final class Settings {
         clockShowAMPM = defaults.bool(forKey: Key.clockShowAMPM)
         clockTimeZoneID = defaults.string(forKey: Key.clockTimeZoneID)
         customCatFileName = defaults.string(forKey: Key.customCatFileName)
+        customCatDoneFileName = defaults.string(forKey: Key.customCatDoneFileName)
+        catRotation = defaults.double(forKey: Key.catRotation)
         catSkinID = defaults.string(forKey: Key.catSkinID)
         timerMode = (defaults.data(forKey: Key.timerMode))
             .flatMap { try? JSONDecoder().decode(TimerMode.self, from: $0) }

@@ -14,6 +14,7 @@ struct WidgetView: View {
     @State private var pulse = false
     @State private var dragStartTimerPos: CGPoint?
     @State private var dragStartFont: CGFloat?
+    @State private var dragStartRotation: Double?   // 회전 드래그 시작 시점 각도
     private let settings = Settings.shared
 
     private var s: CGFloat { layout.scale }
@@ -59,6 +60,7 @@ struct WidgetView: View {
         widget
         .frame(width: bw, height: bh)
         .overlay(alignment: .bottomTrailing) { resizeGrip }
+        .overlay(alignment: .topLeading) { rotateGrip }
         .onHover { h in
             hovering = h
             if !h { revealed = false }
@@ -91,18 +93,65 @@ struct WidgetView: View {
         .padding(4 * s)
     }
 
+    /// 좌상단 회전 손잡이. 드래그하면 위젯 중심 기준으로 고양이를 돌린다. 창 이동 차단.
+    private var rotateGrip: some View {
+        ZStack {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 11 * s, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(5 * s)
+                .background(.black.opacity(0.5), in: Circle())
+                .opacity(showsControls ? 0.9 : 0)
+                .animation(.easeInOut(duration: 0.15), value: showsControls)
+            RotateCatcher(
+                onChanged: { acc in
+                    if dragStartRotation == nil { dragStartRotation = settings.catRotation }
+                    var r = (dragStartRotation ?? 0) - acc   // 마우스 도는 방향 그대로
+                    r = r.truncatingRemainder(dividingBy: 360)
+                    if r < 0 { r += 360 }
+                    settings.catRotation = r
+                },
+                onEnded: { dragStartRotation = nil }
+            )
+            .opacity(showsControls ? 1 : 0)
+            .allowsHitTesting(showsControls)
+        }
+        .frame(width: 30 * s, height: 30 * s)
+        .padding(4 * s)
+    }
+
     // MARK: - 위젯 본체 (투명, 박스 없음)
 
+    /// 커스텀 스킨에서 보일 사진. 타이머가 완료(.done) 상태이고 완료 이미지가 있으면
+    /// 그걸로, 아니면 평소 사진으로. (시계 모드는 완료 개념이 없어 평소 사진 유지)
+    private var customImage: NSImage? {
+        guard skins.skin.isCustom else { return nil }
+        if !isClockMode, engine.state == .done, let done = CustomCat.load(.done) {
+            return done
+        }
+        return CustomCat.load(.normal)
+    }
+
     private var widget: some View {
-        let customImg = skins.skin.isCustom ? CustomCat.load() : nil
+        let customImg = customImage
         let area = imageRect(imgSize: customImg?.size, in: LayoutStore.baseSize)
         let centerBase = clampedTimerCenter(in: area)
+        // 고양이의 실제 렌더 크기(커스텀은 사진 맞춤 사각형, 그 외는 CatView 프레임).
+        let catSize = skins.skin.isCustom
+            ? CGSize(width: area.width * s, height: area.height * s)
+            : CGSize(width: 96 * s * 1.6, height: 96 * s * 1.6)
 
         return ZStack {
             // 투명 영역도 잡아서 창 이동.
             Color.white.opacity(0.001)
 
             catContent(customImg: customImg)
+                // 회전 시 모서리가 위젯 밖으로 나가 잘리지 않게 그만큼 축소.
+                .scaleEffect(catFitScale(contentSize: catSize))
+                .rotationEffect(.degrees(settings.catRotation))
+                // 드래그 중엔 즉각 반응, 설정 버튼 등 비드래그 변경은 부드럽게.
+                .animation(dragStartRotation == nil ? .spring(duration: 0.3) : nil,
+                           value: settings.catRotation)
 
             // 이동·크기 가능한 시간(네이티브 크기로 그려서 또렷함).
             OutlinedText(
@@ -213,13 +262,9 @@ struct WidgetView: View {
             .buttonStyle(.borderedProminent)
             .tint(.red)
         } else {
-            HStack(spacing: 18 * s) {
-                Button(action: engine.toggle) {
-                    Image(systemName: playPauseIcon)
-                }
-                Button(action: engine.reset) {
-                    Image(systemName: "arrow.counterclockwise")
-                }
+            // 재생/일시정지만. 처음으로 되돌리는 리셋은 메뉴바에 있다.
+            Button(action: engine.toggle) {
+                Image(systemName: playPauseIcon)
             }
             .font(.system(size: 14 * s, weight: .bold))
             .buttonStyle(.plain)
@@ -228,6 +273,16 @@ struct WidgetView: View {
             .opacity(showsControls ? 1 : 0)
             .animation(.easeInOut(duration: 0.15), value: showsControls)
         }
+    }
+
+    /// 회전 후 외접 사각형이 위젯(bw×bh) 안에 들어오도록 곱할 축소 배율(≤1).
+    private func catFitScale(contentSize: CGSize) -> CGFloat {
+        let r = settings.catRotation * .pi / 180
+        let c = abs(cos(r)), sn = abs(sin(r))
+        let bboxW = contentSize.width * c + contentSize.height * sn
+        let bboxH = contentSize.width * sn + contentSize.height * c
+        guard bboxW > 0, bboxH > 0 else { return 1 }
+        return min(1, bw / bboxW, bh / bboxH)
     }
 
     // MARK: - 시간 배치 계산 (base 좌표)

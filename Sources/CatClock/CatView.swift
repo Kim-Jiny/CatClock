@@ -24,9 +24,40 @@ struct CatView: View {
     var body: some View {
         if skin.isCustom {
             customBody
+        } else if skin.isImage {
+            imageBody
         } else {
             symbolBody
         }
+    }
+
+    /// 번들 기본 이미지 고양이: 투명 배경 그대로, 모양대로만 보임.
+    @ViewBuilder
+    private var imageBody: some View {
+        ZStack(alignment: .topTrailing) {
+            if let file = skin.imageFile, let img = BundledCat.image(file: file) {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .saturation(state == .running ? 1 : 0.92)
+                    .scaleEffect(state == .done ? 1.06 : 1)
+                    .animation(.spring(duration: 0.35), value: state)
+            } else {
+                Image(systemName: "photo")
+                    .font(.system(size: 34 * scale))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+
+            if let badge {
+                Image(systemName: badge.symbol)
+                    .font(.system(size: 13 * scale, weight: .bold))
+                    .foregroundStyle(badge.color)
+                    .padding(4 * scale)
+                    .background(.black.opacity(0.45), in: Circle())
+            }
+        }
+        .frame(width: 96 * scale, height: 96 * scale)
+        .animation(.spring(duration: 0.3), value: state)
     }
 
     /// 사용자 사진: 투명 배경 그대로, 모양대로만 보임.

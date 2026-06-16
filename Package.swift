@@ -29,6 +29,10 @@ let package = Package(
             name: "CatClock",
             dependencies: sparkleTargetDeps,
             path: "Sources/CatClock",
+            resources: [
+                // 기본 고양이 이미지 폴더. 파일을 넣으면 자동으로 스킨 목록에 추가된다.
+                .copy("Cats")
+            ],
             swiftSettings: swiftSettings
         )
     ]
