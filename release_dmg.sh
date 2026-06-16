@@ -91,10 +91,8 @@ codesign --force --options runtime --timestamp --sign "$DEV_ID" \
          "${SPARKLE_VER_DIR}/Updater.app"
 codesign --force --options runtime --timestamp --sign "$DEV_ID" \
          "$SPARKLE_FW"
-# 리소스 번들(고양이 이미지)도 봉인 일관성을 위해 서명.
-for b in "${APP}/Contents/Resources/"*.bundle; do
-    [ -e "$b" ] && codesign --force --options runtime --timestamp --sign "$DEV_ID" "$b"
-done
+# 리소스 번들(고양이 이미지)은 코드가 없는 플랫 번들이라 따로 서명하지 않는다.
+# 아래 .app 전체 서명 시 리소스로 함께 봉인된다.
 codesign --force --options runtime --timestamp --sign "$DEV_ID" \
          "${APP}/Contents/MacOS/${APP_NAME}"
 codesign --force --options runtime --timestamp --sign "$DEV_ID" \
