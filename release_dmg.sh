@@ -139,7 +139,10 @@ ln -s /Applications "$STAGE/Applications"
 cp Resources/dmg_background.png "$STAGE/.bg.png"
 
 RW_DMG="$(mktemp -u).dmg"
-hdiutil create -srcfolder "$STAGE" -volname "$VOL" -fs HFS+ \
+# APFS 로 생성: HFS+ 는 한글 등 비ASCII 파일명을 NFD 로 정규화해 코드서명 봉인과
+# 어긋나게 만들어(번들 내 고양이 이미지 "file missing") DMG 공증이 Invalid 가 된다.
+# APFS 는 파일명 바이트를 보존해 서명이 유지된다.
+hdiutil create -srcfolder "$STAGE" -volname "$VOL" -fs APFS \
   -format UDRW -ov "$RW_DMG" >/dev/null
 # 잔여 마운트가 남아있으면 hdiutil 이 자동 번호("Install CatClock 1")로 마운트한다.
 # 그 경우 하드코딩한 "$VOL" 로 AppleScript/chflags 가 엉뚱한 볼륨을 건드려
