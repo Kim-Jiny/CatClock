@@ -149,7 +149,9 @@ hdiutil create -srcfolder "$STAGE" -volname "$VOL" -fs APFS \
 # .DS_Store 가 빈 채로 convert 되어 install 창 레이아웃·배경이 통째로 깨진다.
 # 실제 마운트 경로를 hdiutil 출력에서 받아 일관되게 쓴다.
 ATTACH_OUT="$(hdiutil attach "$RW_DMG" -nobrowse)"
-MNT="$(echo "$ATTACH_OUT" | awk -F'\t' '/Apple_HFS|Apple_APFS/ {print $NF}' | tail -1 | sed 's/[[:space:]]*$//')"
+# APFS 는 컨테이너/볼륨이 여러 줄로 나오고 마운트 경로는 실제 볼륨 줄에만 있다.
+# fs 종류와 무관하게 '/Volumes/...' 경로(볼륨명에 공백 허용)를 직접 집어낸다.
+MNT="$(echo "$ATTACH_OUT" | grep -o '/Volumes/.*$' | tail -1 | sed 's/[[:space:]]*$//')"
 [ -d "$MNT" ] || { echo "✗ 마운트 경로를 확정하지 못했습니다: '$MNT'"; echo "$ATTACH_OUT"; exit 1; }
 DISKNAME="$(basename "$MNT")"
 if [ "$DISKNAME" != "$VOL" ]; then
