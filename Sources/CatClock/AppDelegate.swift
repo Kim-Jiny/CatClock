@@ -205,26 +205,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openAbout() {
-        if aboutWindow == nil {
-            #if APPSTORE
-            let onUpdate: (() -> Void)? = nil
-            #else
-            let onUpdate: (() -> Void)? = { [weak self] in self?.checkForUpdates() }
-            #endif
-            let view = AboutView(
-                onUpdate: onUpdate,
-                onClose: { [weak self] in self?.aboutWindow?.close() }
-            )
-            let controller = NSHostingController(rootView: view)
-            let window = NSWindow(contentViewController: controller)
-            window.styleMask = [.titled, .closable]
-            window.title = "CatClock 정보"
-            window.isReleasedWhenClosed = false
-            window.level = .floating
-            window.setContentSize(controller.view.fittingSize)
-            window.center()
-            aboutWindow = window
-        }
+        // 열 때마다 새로 구성한다. 창을 재사용하면 AboutView 의 .task(업데이트 확인)가
+        // 최초 1회만 돌기 때문 — 매번 새 뷰를 만들어 열 때마다 체크하게 한다.
+        aboutWindow?.close()
+        aboutWindow = nil
+
+        #if APPSTORE
+        let onUpdate: (() -> Void)? = nil
+        #else
+        let onUpdate: (() -> Void)? = { [weak self] in self?.checkForUpdates() }
+        #endif
+        let view = AboutView(
+            onUpdate: onUpdate,
+            onClose: { [weak self] in self?.aboutWindow?.close() }
+        )
+        let controller = NSHostingController(rootView: view)
+        let window = NSWindow(contentViewController: controller)
+        window.styleMask = [.titled, .closable]
+        window.title = "CatClock 정보"
+        window.isReleasedWhenClosed = false
+        window.level = .floating
+        window.setContentSize(controller.view.fittingSize)
+        window.center()
+        aboutWindow = window
+
         NSApp.activate(ignoringOtherApps: true)
         aboutWindow?.makeKeyAndOrderFront(nil)
     }

@@ -5,14 +5,17 @@ import AppKit
 final class AboutViewModel: ObservableObject {
     @Published var currentVersion: String
     @Published var latestVersion: String?
+    @Published var latestBuild: Int?
     @Published var loading: Bool = false
     @Published var errorMessage: String?
 
+    let currentBuild: Int
     private let feedURL: URL?
 
     init() {
         let info = Bundle.main.infoDictionary
         currentVersion = info?["CFBundleShortVersionString"] as? String ?? "?"
+        currentBuild = Int(info?["CFBundleVersion"] as? String ?? "") ?? 0
         if let s = info?["SUFeedURL"] as? String {
             feedURL = URL(string: s)
         } else {
@@ -33,8 +36,10 @@ final class AboutViewModel: ObservableObject {
             var req = URLRequest(url: feedURL, cachePolicy: .reloadIgnoringLocalCacheData)
             req.timeoutInterval = 10
             let (data, _) = try await URLSession.shared.data(for: req)
-            latestVersion = AppcastVersionParser.firstShortVersion(in: data)
-            if latestVersion == nil {
+            if let item = AppcastVersionParser.firstItem(in: data) {
+                latestVersion = item.short
+                latestBuild = item.build
+            } else {
                 errorMessage = "appcast 파싱 실패"
             }
         } catch {
@@ -42,19 +47,36 @@ final class AboutViewModel: ObservableObject {
         }
     }
 
+    /// 표시버전이 더 높거나, 같은 표시버전이라도 빌드 번호가 더 높으면 업데이트로 본다.
     var hasUpdate: Bool {
         guard let latest = latestVersion else { return false }
-        return AppcastVersionParser.compare(latest, currentVersion) == .orderedDescending
+        switch AppcastVersionParser.compare(latest, currentVersion) {
+        case .orderedDescending: return true
+        case .orderedSame:       return (latestBuild ?? 0) > currentBuild
+        case .orderedAscending:  return false
+        }
+    }
+
+    var currentVersionDisplay: String {
+        currentBuild > 0 ? "\(currentVersion) (\(currentBuild))" : currentVersion
+    }
+
+    var latestVersionDisplay: String? {
+        guard let latest = latestVersion else { return nil }
+        if let b = latestBuild { return "\(latest) (\(b))" }
+        return latest
     }
 }
 
 enum AppcastVersionParser {
-    static func firstShortVersion(in data: Data) -> String? {
-        let delegate = ShortVersionParserDelegate()
+    /// 최신(첫) item 의 (표시버전, 빌드번호).
+    static func firstItem(in data: Data) -> (short: String, build: Int?)? {
+        let delegate = ItemParserDelegate()
         let parser = XMLParser(data: data)
         parser.delegate = delegate
         parser.parse()
-        return delegate.found
+        guard let short = delegate.shortVersion else { return nil }
+        return (short, delegate.build)
     }
 
     static func compare(_ a: String, _ b: String) -> ComparisonResult {
@@ -70,31 +92,35 @@ enum AppcastVersionParser {
     }
 }
 
-private final class ShortVersionParserDelegate: NSObject, XMLParserDelegate {
-    var found: String?
-    private var capturing = false
+/// appcast 첫 item 의 sparkle:shortVersionString 과 sparkle:version(빌드) 를 잡는다.
+private final class ItemParserDelegate: NSObject, XMLParserDelegate {
+    var shortVersion: String?
+    var build: Int?
+    private var capturing: String?
     private var buffer = ""
 
     func parser(_ parser: XMLParser, didStartElement elementName: String,
                 namespaceURI: String?, qualifiedName qName: String?,
                 attributes attributeDict: [String: String]) {
-        if found == nil, elementName == "sparkle:shortVersionString" {
-            capturing = true
-            buffer = ""
+        if elementName == "sparkle:shortVersionString", shortVersion == nil {
+            capturing = elementName; buffer = ""
+        } else if elementName == "sparkle:version", build == nil {
+            capturing = elementName; buffer = ""
         }
     }
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
-        if capturing { buffer += string }
+        if capturing != nil { buffer += string }
     }
 
     func parser(_ parser: XMLParser, didEndElement elementName: String,
                 namespaceURI: String?, qualifiedName qName: String?) {
-        if capturing, elementName == "sparkle:shortVersionString" {
-            found = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
-            capturing = false
-            parser.abortParsing()
-        }
+        guard capturing == elementName else { return }
+        let val = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+        if elementName == "sparkle:shortVersionString" { shortVersion = val }
+        else if elementName == "sparkle:version" { build = Int(val) }
+        capturing = nil
+        if shortVersion != nil, build != nil { parser.abortParsing() }
     }
 }
 
@@ -120,7 +146,7 @@ struct AboutView: View {
             }
 
             VStack(spacing: 8) {
-                row(label: "현재 버전", value: viewModel.currentVersion)
+                row(label: "현재 버전", value: viewModel.currentVersionDisplay)
                 if showsUpdateChannel {
                     Divider()
                     HStack {
@@ -128,7 +154,7 @@ struct AboutView: View {
                         Spacer()
                         if viewModel.loading {
                             ProgressView().controlSize(.small)
-                        } else if let latest = viewModel.latestVersion {
+                        } else if let latest = viewModel.latestVersionDisplay {
                             Text(latest)
                         } else if let err = viewModel.errorMessage {
                             Text("확인 실패")
