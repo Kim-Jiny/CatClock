@@ -28,19 +28,32 @@ enum BundledCat {
     /// 유니코드 정규화 불일치로 nil 나는 문제 회피) 이미지를 직접 연다.
     private static var urlMap: [String: URL] = [:]
 
-    /// `Cats/` 폴더의 이미지 → 스킨 목록(이름순). 한 번 계산해 캐시.
+    /// 파일명(확장자 제외) → 한글 표시이름. `Cats/names.json` 에서 읽는다.
+    /// 파일명은 ASCII 로 두고(코드서명·DMG·pkg 의 유니코드 정규화 문제 회피),
+    /// 표시이름만 한글로 분리. 매핑에 없으면 파일명을 그대로 표시이름으로 쓴다.
+    private static let displayNames: [String: String] = {
+        guard let urls = bundle?.urls(forResourcesWithExtension: "json", subdirectory: "Cats"),
+              let url = urls.first(where: { $0.lastPathComponent == "names.json" }),
+              let data = try? Data(contentsOf: url),
+              let map = try? JSONDecoder().decode([String: String].self, from: data)
+        else { return [:] }
+        return map
+    }()
+
+    /// `Cats/` 폴더의 이미지 → 스킨 목록(표시이름순). 한 번 계산해 캐시.
     static let skins: [CatSkin] = {
         guard let urls = bundle?.urls(forResourcesWithExtension: nil, subdirectory: "Cats") else { return [] }
-        let images = urls
-            .filter { imageExtensions.contains($0.pathExtension.lowercased()) }
-            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+        let images = urls.filter { imageExtensions.contains($0.pathExtension.lowercased()) }
         var map: [String: URL] = [:]
         let result = images.map { url -> CatSkin in
             let file = url.lastPathComponent
             map[file] = url
-            let name = url.deletingPathExtension().lastPathComponent
+            let stem = url.deletingPathExtension().lastPathComponent
+            let name = displayNames[stem] ?? stem
+            // ID 는 표시이름 기반(기존 배포본과 동일 유지) — 내부 식별자라 한글 OK.
             return CatSkin(id: "bundled:\(name)", name: name, imageFile: file)
         }
+        .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         urlMap = map
         return result
     }()
